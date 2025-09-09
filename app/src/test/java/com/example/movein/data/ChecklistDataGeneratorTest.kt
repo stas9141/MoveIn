@@ -2,7 +2,8 @@ package com.example.movein.data
 
 import org.junit.Test
 import org.junit.Assert.*
-import com.example.movein.data.ChecklistDataGenerator
+import com.example.movein.shared.data.ChecklistDataGenerator
+import com.example.movein.shared.data.UserData
 
 class ChecklistDataGeneratorTest {
 

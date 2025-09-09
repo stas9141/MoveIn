@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MoveIn"
 include(":app")
+include(":shared")

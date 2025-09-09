@@ -20,14 +20,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.Defect
-import com.example.movein.data.DefectCategory
-import com.example.movein.data.DefectStatus
-import com.example.movein.data.Priority
+import com.example.movein.shared.data.Defect
+import com.example.movein.shared.data.DefectCategory
+import com.example.movein.shared.data.DefectStatus
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.SubTask
 import com.example.movein.ui.components.PriorityDropdown
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.formatPriority
@@ -300,6 +302,7 @@ fun DefectCard(
     onClick: () -> Unit,
     onDefectUpdate: (Defect) -> Unit
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -324,17 +327,49 @@ fun DefectCard(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = defect.location,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = if (defect.status == DefectStatus.CLOSED) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Checklist icon for tasks with sub-tasks
+                        if (defect.subTasks.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Has sub-tasks",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
-                    )
+                        
+                        Text(
+                            text = defect.location,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = if (defect.status == DefectStatus.CLOSED) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        // Chevron for expandable tasks
+                        if (defect.subTasks.isNotEmpty()) {
+                            IconButton(
+                                onClick = { isExpanded = !isExpanded },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.graphicsLayer(rotationZ = if (isExpanded) 180f else 0f)
+                                    )
+                            }
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(4.dp))
                     
@@ -435,7 +470,113 @@ fun DefectCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            // Expandable sub-tasks view
+            if (defect.subTasks.isNotEmpty() && isExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Progress indicator
+                val completedSubTasks = defect.subTasks.count { it.isCompleted }
+                val totalSubTasks = defect.subTasks.size
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Sub-tasks: $completedSubTasks/$totalSubTasks complete",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            // Progress percentage
+                            Text(
+                                text = "${if (totalSubTasks > 0) (completedSubTasks * 100 / totalSubTasks) else 0}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Progress bar
+                        LinearProgressIndicator(
+                            progress = if (totalSubTasks > 0) completedSubTasks.toFloat() / totalSubTasks else 0f,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Sub-tasks list
+                        defect.subTasks.forEach { subTask ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Indentation for sub-tasks
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                // Sub-task status indicator
+                                Surface(
+                                    color = if (subTask.isCompleted) {
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                                    } else {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    },
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (subTask.isCompleted) {
+                                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+                                        } else {
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                        }
+                                    ),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    if (subTask.isCompleted) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Completed",
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = subTask.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (subTask.isCompleted) {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -460,6 +601,32 @@ fun DefectCard(
                             onDefectUpdate(updatedDefect)
                         }
                     )
+                    
+                    // Sub-task progress indicator
+                    if (defect.subTasks.isNotEmpty()) {
+                        val completedSubTasks = defect.subTasks.count { it.isCompleted }
+                        val totalSubTasks = defect.subTasks.size
+                        
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "$completedSubTasks/$totalSubTasks",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                 }
                 
                 // Due date if available

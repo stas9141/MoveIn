@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.13.0" type="incidents">
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of `compileSdkVersion` than 34 is available: 36">
+        <fix-replace
+            description="Set compileSdkVersion to 36"
+            oldString="34"
+            replacement="36"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="51"
+            column="5"
+            startOffset="1148"
+            endLine="51"
+            endColumn="20"
+            endOffset="1163"/>
+    </incident>
+
+    <incident
+        id="NewerVersionAvailable"
+        severity="warning"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-core than 1.7.3 is available: 1.10.2">
+        <fix-replace
+            description="Change to 1.10.2"
+            family="Update versions"
+            oldString="1.7.3"
+            replacement="1.10.2"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="28"
+            column="32"
+            startOffset="510"
+            endLine="28"
+            endColumn="85"
+            endOffset="563"/>
+    </incident>
+
+    <incident
+        id="UseTomlInstead"
+        severity="warning"
+        message="Use version catalog instead">
+        <fix-composite
+            description="Replace with new library catalog declaration for jetbrains-kotlinx-coroutines-core"
+            robot="true">
+            <fix-replace
+                description="Replace with kotlinxCoroutinesCoreVersion = &quot;1.7.3&quot;..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="kotlinxCoroutinesCoreVersion = &quot;1.7.3&quot;&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="126"
+                    endOffset="126"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with jetbrains-kotlinx-coroutines-core = { module = &quot;org.jetbrains.kotlinx:kotlinx-coroutines-core&quot;, version.ref = &quot;kotlinxCoroutinesCoreVersion&quot; }..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="jetbrains-kotlinx-coroutines-core = { module = &quot;org.jetbrains.kotlinx:kotlinx-coroutines-core&quot;, version.ref = &quot;kotlinxCoroutinesCoreVersion&quot; }&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="313"
+                    endOffset="313"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with libs.jetbrains.kotlinx.coroutines.core"
+                robot="true"
+                replacement="libs.jetbrains.kotlinx.coroutines.core"
+                priority="0">
+                <range
+                    file="${:shared*projectDir}/build.gradle.kts"
+                    startOffset="510"
+                    endOffset="563"/>
+            </fix-replace>
+        </fix-composite>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="28"
+            column="32"
+            startOffset="510"
+            endLine="28"
+            endColumn="85"
+            endOffset="563"/>
+    </incident>
+
+</incidents>

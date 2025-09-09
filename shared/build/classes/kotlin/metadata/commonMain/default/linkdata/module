@@ -1,0 +1,2 @@
+
+<shared_commonMain>:com.example.movein.shared.data:$com.example.movein.shared.repository:!com.example.movein.shared.storage

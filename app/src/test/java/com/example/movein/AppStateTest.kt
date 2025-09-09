@@ -1,12 +1,17 @@
 package com.example.movein
 
-import com.example.movein.data.ChecklistItem
-import com.example.movein.data.Priority
-import com.example.movein.data.UserData
+import com.example.movein.shared.data.ChecklistItem
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.UserData
+import com.example.movein.shared.data.FileAttachment
+import com.example.movein.shared.data.SubTask
 import com.example.movein.navigation.Screen
+import com.example.movein.shared.storage.DefectStorage
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.Before
+import io.mockk.mockk
+import io.mockk.every
 
 class AppStateTest {
 
@@ -14,7 +19,10 @@ class AppStateTest {
 
     @Before
     fun setUp() {
-        appState = AppState()
+        val mockDefectStorage = mockk<DefectStorage>()
+        every { mockDefectStorage.loadDefects() } returns emptyList()
+        every { mockDefectStorage.saveDefects(any()) } returns Unit
+        appState = AppState(mockDefectStorage)
     }
 
     @Test
@@ -136,7 +144,7 @@ class AppStateTest {
         val originalTask = appState.checklistData!!.firstWeek[0]
         val updatedTask = originalTask.copy(
             attachments = listOf(
-                com.example.movein.data.FileAttachment(
+                FileAttachment(
                     id = "attachment_id",
                     name = "test.jpg",
                     type = "image",
@@ -163,7 +171,7 @@ class AppStateTest {
         val originalTask = appState.checklistData!!.firstWeek[0]
         val updatedTask = originalTask.copy(
             subTasks = listOf(
-                com.example.movein.data.SubTask(
+                SubTask(
                     id = "subtask_id",
                     title = "Sub Task",
                     isCompleted = true

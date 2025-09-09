@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun WelcomeScreen(
     onGetStartedClick: () -> Unit,
+    onSignInClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -68,6 +69,23 @@ fun WelcomeScreen(
         ) {
             Text(
                 text = "Get Started",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Sign In Button
+        OutlinedButton(
+            onClick = onSignInClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(
+                text = "Sign In to Sync Data",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 )

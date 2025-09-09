@@ -2,6 +2,7 @@ package com.example.movein.data
 
 import org.junit.Test
 import org.junit.Assert.*
+import com.example.movein.shared.data.*
 
 class ModelsTest {
 

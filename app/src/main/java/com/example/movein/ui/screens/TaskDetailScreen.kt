@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -14,6 +16,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,19 +31,25 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.ChecklistItem
-import com.example.movein.data.SubTask
-import com.example.movein.data.Priority
-import com.example.movein.data.FileAttachment
+import com.example.movein.shared.data.ChecklistItem
+import com.example.movein.shared.data.SubTask
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.FileAttachment
 import com.example.movein.utils.getTodayString
 import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
 import com.example.movein.utils.formatPriority
+import com.example.movein.utils.formatDateForDisplay
+import com.example.movein.utils.formatTaskStatus
+import com.example.movein.ui.components.EnhancedDatePicker
+import com.example.movein.ui.components.TaskStatusDropdown
 import java.util.*
 
 @Composable
@@ -55,6 +65,35 @@ fun TaskDetailScreen(
     var showPriorityDialog by remember { mutableStateOf(false) }
     var showDueDateDialog by remember { mutableStateOf(false) }
     var showAttachmentDialog by remember { mutableStateOf(false) }
+    var editingSubTaskId by remember { mutableStateOf<String?>(null) }
+    var editingSubTaskText by remember { mutableStateOf("") }
+    
+    // Helper functions for sub-task editing
+    val startEditingSubTask = { subTaskId: String, currentText: String ->
+        editingSubTaskId = subTaskId
+        editingSubTaskText = currentText
+    }
+    
+    val saveSubTaskChanges = {
+        if (editingSubTaskId != null && editingSubTaskText.isNotBlank()) {
+            val updatedSubTasks = currentTask.subTasks.map { subTask ->
+                if (subTask.id == editingSubTaskId) {
+                    subTask.copy(title = editingSubTaskText)
+                } else {
+                    subTask
+                }
+            }
+            currentTask = currentTask.copy(subTasks = updatedSubTasks)
+            onTaskUpdate(currentTask)
+        }
+        editingSubTaskId = null
+        editingSubTaskText = ""
+    }
+    
+    val cancelSubTaskEditing = {
+        editingSubTaskId = null
+        editingSubTaskText = ""
+    }
 
     Column(
         modifier = modifier
@@ -100,9 +139,12 @@ fun TaskDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = currentTask.isCompleted,
+                            checked = currentTask.isCompleted || currentTask.status == com.example.movein.shared.data.TaskStatus.CLOSED,
                             onCheckedChange = { isChecked ->
-                                currentTask = currentTask.copy(isCompleted = isChecked)
+                                currentTask = currentTask.copy(
+                                    isCompleted = isChecked,
+                                    status = if (isChecked) com.example.movein.shared.data.TaskStatus.CLOSED else com.example.movein.shared.data.TaskStatus.OPEN
+                                )
                                 onTaskUpdate(currentTask)
                             }
                         )
@@ -154,7 +196,7 @@ fun TaskDetailScreen(
                                 currentTask.dueDate?.let { dueDate ->
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Due: $dueDate",
+                                        text = "Due: ${formatDateForDisplay(dueDate)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                     )
@@ -198,13 +240,41 @@ fun TaskDetailScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Priority & Due Date",
+                            text = "Status, Priority & Due Date",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
+                        // Task Status
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Status",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TaskStatusDropdown(
+                                    currentStatus = currentTask.status,
+                                    onStatusChange = { status ->
+                                        currentTask = currentTask.copy(
+                                            status = status,
+                                            isCompleted = status == com.example.movein.shared.data.TaskStatus.CLOSED
+                                        )
+                                        onTaskUpdate(currentTask)
+                                    }
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Priority
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -248,7 +318,7 @@ fun TaskDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = currentTask.dueDate ?: "Not set",
+                                    text = formatDateForDisplay(currentTask.dueDate),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -393,8 +463,9 @@ fun TaskDetailScreen(
                             IconButton(
                                 onClick = {
                                     if (newSubTaskText.isNotBlank()) {
+                                        val newSubTaskId = UUID.randomUUID().toString()
                                         val newSubTask = SubTask(
-                                            id = UUID.randomUUID().toString(),
+                                            id = newSubTaskId,
                                             title = newSubTaskText
                                         )
                                         currentTask = currentTask.copy(
@@ -402,6 +473,9 @@ fun TaskDetailScreen(
                                         )
                                         onTaskUpdate(currentTask)
                                         newSubTaskText = ""
+                                        
+                                        // Auto-open the new sub-task for editing
+                                        startEditingSubTask(newSubTaskId, newSubTask.title)
                                     }
                                 }
                             ) {
@@ -416,13 +490,19 @@ fun TaskDetailScreen(
             items(currentTask.subTasks) { subTask ->
                 SubTaskItem(
                     subTask = subTask,
+                    isEditing = editingSubTaskId == subTask.id,
+                    editingText = editingSubTaskText,
                     onToggle = { isChecked ->
                         val updatedSubTasks = currentTask.subTasks.map { 
                             if (it.id == subTask.id) it.copy(isCompleted = isChecked) else it 
                         }
                         currentTask = currentTask.copy(subTasks = updatedSubTasks)
                         onTaskUpdate(currentTask)
-                    }
+                    },
+                    onEditClick = { startEditingSubTask(subTask.id, subTask.title) },
+                    onTextChange = { editingSubTaskText = it },
+                    onSave = saveSubTaskChanges,
+                    onCancel = cancelSubTaskEditing
                 )
             }
         }
@@ -467,99 +547,14 @@ fun TaskDetailScreen(
         
         // Due Date Dialog
         if (showDueDateDialog) {
-            var selectedDate by remember { mutableStateOf(currentTask.dueDate ?: "") }
-            var currentMonth by remember { mutableStateOf(0) } // 0 = current month
-            
-            AlertDialog(
-                onDismissRequest = { showDueDateDialog = false },
-                title = { Text("Set Due Date") },
-                text = {
-                    Column {
-                        // Calendar Header
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { currentMonth-- }
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous Month")
-                            }
-                            
-                            Text(
-                                text = getMonthYearString(currentMonth),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            
-                            IconButton(
-                                onClick = { currentMonth++ }
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Month")
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Calendar Grid
-                        CalendarGrid(
-                            currentMonth = currentMonth,
-                            selectedDate = selectedDate,
-                            onDateSelected = { date ->
-                                selectedDate = date
-                            }
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Quick Actions
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            TextButton(
-                                onClick = { selectedDate = getTodayString() }
-                            ) {
-                                Text("Today")
-                            }
-                            TextButton(
-                                onClick = { selectedDate = getTomorrowString() }
-                            ) {
-                                Text("Tomorrow")
-                            }
-                            TextButton(
-                                onClick = { selectedDate = getNextWeekString() }
-                            ) {
-                                Text("Next Week")
-                            }
-                        }
-                    }
+            EnhancedDatePicker(
+                selectedDate = currentTask.dueDate,
+                onDateSelected = { date ->
+                    currentTask = currentTask.copy(dueDate = date)
+                    onTaskUpdate(currentTask)
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            currentTask = currentTask.copy(dueDate = if (selectedDate.isNotBlank()) selectedDate else null)
-                            onTaskUpdate(currentTask)
-                            showDueDateDialog = false
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text("Set")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showDueDateDialog = false },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text("Cancel")
-                    }
-                }
+                onDismiss = { showDueDateDialog = false },
+                title = "Set Due Date"
             )
         }
         
@@ -697,7 +692,13 @@ fun AttachmentDialog(
 @Composable
 fun SubTaskItem(
     subTask: SubTask,
-    onToggle: (Boolean) -> Unit
+    isEditing: Boolean,
+    editingText: String,
+    onToggle: (Boolean) -> Unit,
+    onEditClick: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -717,15 +718,60 @@ fun SubTaskItem(
                 modifier = Modifier.padding(end = 8.dp)
             )
             
-            Text(
-                text = subTask.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (subTask.isCompleted) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.onSurface
+            if (isEditing) {
+                // Editing mode
+                OutlinedTextField(
+                    value = editingText,
+                    onValueChange = onTextChange,
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = { onSave() }
+                    ),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                IconButton(onClick = onSave) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Save",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
-            )
+                
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Cancel",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // Display mode
+                Text(
+                    text = subTask.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (subTask.isCompleted) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onEditClick() }
+                )
+                
+                IconButton(onClick = onEditClick) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
 }

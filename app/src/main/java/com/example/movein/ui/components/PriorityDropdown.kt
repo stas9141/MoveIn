@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.Priority
+import com.example.movein.shared.data.Priority
 import com.example.movein.utils.formatPriority
 
 @Composable

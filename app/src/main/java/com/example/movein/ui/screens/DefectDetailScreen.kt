@@ -13,25 +13,30 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.Defect
-import com.example.movein.data.SubTask
-import com.example.movein.data.Priority
-import com.example.movein.data.DefectStatus
-import com.example.movein.data.DefectCategory
+import com.example.movein.shared.data.Defect
+import com.example.movein.shared.data.SubTask
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.DefectStatus
+import com.example.movein.shared.data.DefectCategory
 import com.example.movein.ui.components.PriorityDropdown
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.getTodayString
 import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
+import com.example.movein.utils.formatDateForDisplay
+import com.example.movein.ui.components.EnhancedDatePicker
 import java.util.*
 
 @Composable
@@ -46,6 +51,44 @@ fun DefectDetailScreen(
     var newNoteText by remember { mutableStateOf(defect.notes) }
     var showStatusDialog by remember { mutableStateOf(false) }
     var showDueDateDialog by remember { mutableStateOf(false) }
+    var showCompleteAllDialog by remember { mutableStateOf(false) }
+    var showRemoveAllDialog by remember { mutableStateOf(false) }
+    var editingSubTaskId by remember { mutableStateOf<String?>(null) }
+    var editingSubTaskText by remember { mutableStateOf("") }
+    
+    // Helper function to check if defect has open sub-tasks
+    fun hasOpenSubTasks(defect: Defect): Boolean {
+        return defect.subTasks.any { !it.isCompleted }
+    }
+    
+    // Helper function to start editing a sub-task
+    fun startEditingSubTask(subTask: SubTask) {
+        editingSubTaskId = subTask.id
+        editingSubTaskText = subTask.title
+    }
+    
+    // Helper function to save sub-task changes
+    fun saveSubTaskChanges() {
+        if (editingSubTaskId != null && editingSubTaskText.isNotBlank()) {
+            val updatedSubTasks = currentDefect.subTasks.map {
+                if (it.id == editingSubTaskId) {
+                    it.copy(title = editingSubTaskText.trim())
+                } else {
+                    it
+                }
+            }
+            currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
+            onDefectUpdate(currentDefect)
+        }
+        editingSubTaskId = null
+        editingSubTaskText = ""
+    }
+    
+    // Helper function to cancel sub-task editing
+    fun cancelSubTaskEditing() {
+        editingSubTaskId = null
+        editingSubTaskText = ""
+    }
 
     Column(
         modifier = modifier
@@ -198,6 +241,33 @@ fun DefectDetailScreen(
                             
                             Spacer(modifier = Modifier.width(8.dp))
                             
+                            // Sub-task indicator in header
+                            if (currentDefect.subTasks.isNotEmpty()) {
+                                val openSubTasks = currentDefect.subTasks.count { !it.isCompleted }
+                                if (openSubTasks > 0) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                                        shape = MaterialTheme.shapes.small,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                                                                                                                                                                                                                                                    Text(
+                                        text = "Tasks: $openSubTasks",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                            }
+                            
                             // Due Date
                             currentDefect.dueDate?.let { dueDate ->
                                 Surface(
@@ -310,7 +380,7 @@ fun DefectDetailScreen(
                             Icon(
                                 imageVector = when (currentDefect.status) {
                                     DefectStatus.OPEN -> Icons.Default.Info
-                                    DefectStatus.IN_PROGRESS -> Icons.Default.Star
+                                    DefectStatus.IN_PROGRESS -> Icons.Default.Info
                                     DefectStatus.CLOSED -> Icons.Default.CheckCircle
                                 },
                                 contentDescription = null
@@ -318,6 +388,35 @@ fun DefectDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Change Status: ${currentDefect.status.name.replace("_", " ")}")
                         }
+                        
+                                                    // Gentle reminder about open sub-tasks
+                            if (hasOpenSubTasks(currentDefect)) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                                    shape = MaterialTheme.shapes.small,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Info",
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "You have ${currentDefect.subTasks.count { !it.isCompleted }} open sub-tasks - consider completing them before closing the defect",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                }
+                            }
                     }
                 }
             }
@@ -347,7 +446,7 @@ fun DefectDetailScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = currentDefect.dueDate ?: "Set Due Date"
+                                text = formatDateForDisplay(currentDefect.dueDate)
                             )
                         }
                     }
@@ -399,13 +498,140 @@ fun DefectDetailScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Text(
-                            text = "Sub-tasks",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Sub-tasks",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            // Sub-task summary indicator
+                            if (currentDefect.subTasks.isNotEmpty()) {
+                                val totalSubTasks = currentDefect.subTasks.size
+                                val completedSubTasks = currentDefect.subTasks.count { it.isCompleted }
+                                val openSubTasks = totalSubTasks - completedSubTasks
+                                
+                                if (openSubTasks > 0) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                                        shape = MaterialTheme.shapes.small,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Open Sub-tasks",
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "$openSubTasks/$totalSubTasks open",
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.SemiBold
+                                                ),
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    // All sub-tasks completed
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)),
+                                        shape = MaterialTheme.shapes.small,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "All Sub-tasks Completed",
+                                                tint = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "All completed",
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.SemiBold
+                                                ),
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Gentle action buttons for open sub-tasks
+                        if (hasOpenSubTasks(currentDefect)) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showCompleteAllDialog = true },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Mark All Complete",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Mark All Complete",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                
+                                OutlinedButton(
+                                    onClick = { showRemoveAllDialog = true },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Clear All Sub-tasks",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Clear All Sub-tasks",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            // Helpful hint
+                                                    Text(
+                            text = "Quick actions to help manage your sub-tasks efficiently.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
+                        }
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
@@ -417,7 +643,28 @@ fun DefectDetailScreen(
                                 value = newSubTaskText,
                                 onValueChange = { newSubTaskText = it },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Add a sub-task...") }
+                                placeholder = { Text("Add a sub-task...") },
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        if (newSubTaskText.isNotBlank()) {
+                                            val newSubTask = SubTask(
+                                                id = UUID.randomUUID().toString(),
+                                                title = newSubTaskText
+                                            )
+                                            currentDefect = currentDefect.copy(
+                                                subTasks = currentDefect.subTasks + newSubTask
+                                            )
+                                            onDefectUpdate(currentDefect)
+                                            newSubTaskText = ""
+                                            
+                                            // Automatically start editing the newly created sub-task
+                                            startEditingSubTask(newSubTask)
+                                        }
+                                    }
+                                )
                             )
                             
                             Spacer(modifier = Modifier.width(8.dp))
@@ -434,6 +681,9 @@ fun DefectDetailScreen(
                                         )
                                         onDefectUpdate(currentDefect)
                                         newSubTaskText = ""
+                                        
+                                        // Automatically start editing the newly created sub-task
+                                        startEditingSubTask(newSubTask)
                                     }
                                 }
                             ) {
@@ -466,25 +716,69 @@ fun DefectDetailScreen(
                                     }
                                 )
                                 
-                                Text(
-                                    text = subTask.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                    color = if (subTask.isCompleted) {
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    }
-                                )
+                                // Sub-task title - editable when editing
+                                if (editingSubTaskId == subTask.id) {
+                                    OutlinedTextField(
+                                        value = editingSubTaskText,
+                                        onValueChange = { editingSubTaskText = it },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                        ),
+                                        textStyle = MaterialTheme.typography.bodyMedium,
+                                        keyboardOptions = KeyboardOptions(
+                                            imeAction = ImeAction.Done
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onDone = { saveSubTaskChanges() }
+                                        )
+                                    )
+                                } else {
+                                    Text(
+                                        text = subTask.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                        color = if (subTask.isCompleted) {
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                }
                                 
-                                IconButton(
-                                    onClick = {
-                                        val updatedSubTasks = currentDefect.subTasks.filter { it.id != subTask.id }
-                                        currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
-                                        onDefectUpdate(currentDefect)
+                                // Action buttons
+                                if (editingSubTaskId == subTask.id) {
+                                    // Save and Cancel buttons when editing
+                                    IconButton(
+                                        onClick = { saveSubTaskChanges() }
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = "Save sub-task")
                                     }
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete sub-task")
+                                    
+                                    IconButton(
+                                        onClick = { cancelSubTaskEditing() }
+                                    ) {
+                                        Icon(Icons.Default.Info, contentDescription = "Cancel editing")
+                                    }
+                                } else {
+                                    // Edit and Delete buttons when not editing
+                                    IconButton(
+                                        onClick = { startEditingSubTask(subTask) }
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit sub-task")
+                                    }
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            val updatedSubTasks = currentDefect.subTasks.filter { it.id != subTask.id }
+                                            currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
+                                            onDefectUpdate(currentDefect)
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete sub-task")
+                                    }
                                 }
                             }
                         }
@@ -567,25 +861,66 @@ fun DefectDetailScreen(
             title = { Text("Change Status") },
             text = {
                 Column {
+                    // Helpful message for open sub-tasks
+                    if (hasOpenSubTasks(currentDefect)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Info",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "You have ${currentDefect.subTasks.count { !it.isCompleted }} open sub-tasks",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = "Consider completing all sub-tasks before closing the defect to ensure nothing is missed.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
                     DefectStatus.values().forEach { status ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    currentDefect = currentDefect.copy(status = status)
-                                    onDefectUpdate(currentDefect)
-                                    showStatusDialog = false
-                                }
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = currentDefect.status == status,
                                 onClick = {
-                                    currentDefect = currentDefect.copy(status = status)
-                                    onDefectUpdate(currentDefect)
-                                    showStatusDialog = false
-                                }
+                                    // Only allow status change if not trying to close with open sub-tasks
+                                    if (status != DefectStatus.CLOSED || !hasOpenSubTasks(currentDefect)) {
+                                        currentDefect = currentDefect.copy(status = status)
+                                        onDefectUpdate(currentDefect)
+                                        showStatusDialog = false
+                                    }
+                                },
+                                enabled = !(status == DefectStatus.CLOSED && hasOpenSubTasks(currentDefect))
                             )
                             
                             Spacer(modifier = Modifier.width(8.dp))
@@ -649,25 +984,39 @@ fun DefectDetailScreen(
                             
                             Spacer(modifier = Modifier.width(12.dp))
                             
-                            Text(
-                                text = when (status) {
-                                    DefectStatus.OPEN -> "Open"
-                                    DefectStatus.IN_PROGRESS -> "In Progress"
-                                    DefectStatus.CLOSED -> "Closed"
-                                },
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = if (currentDefect.status == status) FontWeight.SemiBold else FontWeight.Normal
-                                ),
-                                color = if (currentDefect.status == status) {
-                                    when (status) {
-                                        DefectStatus.OPEN -> MaterialTheme.colorScheme.outline
-                                        DefectStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary
-                                        DefectStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                            Column {
+                                Text(
+                                    text = when (status) {
+                                        DefectStatus.OPEN -> "Open"
+                                        DefectStatus.IN_PROGRESS -> "In Progress"
+                                        DefectStatus.CLOSED -> "Closed"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = if (currentDefect.status == status) FontWeight.SemiBold else FontWeight.Normal
+                                    ),
+                                    color = if (currentDefect.status == status) {
+                                        when (status) {
+                                            DefectStatus.OPEN -> MaterialTheme.colorScheme.outline
+                                            DefectStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary
+                                            DefectStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                        }
+                                    } else if (status == DefectStatus.CLOSED && hasOpenSubTasks(currentDefect)) {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
                                     }
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
+                                )
+                                
+                                // Show helpful hint for Closed status with open sub-tasks
+                                if (status == DefectStatus.CLOSED && hasOpenSubTasks(currentDefect)) {
+                                    Text(
+                                        text = "Has open sub-tasks",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -682,64 +1031,120 @@ fun DefectDetailScreen(
     
     // Due Date Dialog
     if (showDueDateDialog) {
+        EnhancedDatePicker(
+            selectedDate = currentDefect.dueDate,
+            onDateSelected = { date ->
+                currentDefect = currentDefect.copy(dueDate = date)
+                onDefectUpdate(currentDefect)
+            },
+            onDismiss = { showDueDateDialog = false },
+            title = "Set Due Date"
+        )
+    }
+    
+    // Complete All Sub-tasks Confirmation Dialog
+    if (showCompleteAllDialog) {
         AlertDialog(
-            onDismissRequest = { showDueDateDialog = false },
-            title = { Text("Set Due Date") },
+            onDismissRequest = { showCompleteAllDialog = false },
+            title = { 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Mark All Sub-tasks Complete?")
+                }
+            },
             text = {
                 Column {
-                    Button(
-                        onClick = {
-                            currentDefect = currentDefect.copy(dueDate = getTodayString())
-                            onDefectUpdate(currentDefect)
-                            showDueDateDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Today")
-                    }
-                    
+                    Text(
+                        text = "This will mark all ${currentDefect.subTasks.count { !it.isCompleted }} open sub-tasks as completed.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = {
-                            currentDefect = currentDefect.copy(dueDate = getTomorrowString())
-                            onDefectUpdate(currentDefect)
-                            showDueDateDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Tomorrow")
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = {
-                            currentDefect = currentDefect.copy(dueDate = getNextWeekString())
-                            onDefectUpdate(currentDefect)
-                            showDueDateDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Next Week")
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = {
-                            currentDefect = currentDefect.copy(dueDate = null)
-                            onDefectUpdate(currentDefect)
-                            showDueDateDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Remove Due Date")
-                    }
+                    Text(
+                        text = "This is useful when you've finished all the related work. Would you like to proceed?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDueDateDialog = false }) {
+                Button(
+                    onClick = {
+                        val updatedSubTasks = currentDefect.subTasks.map { it.copy(isCompleted = true) }
+                        currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
+                        onDefectUpdate(currentDefect)
+                        showCompleteAllDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Complete All")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCompleteAllDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Remove All Sub-tasks Confirmation Dialog
+    if (showRemoveAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveAllDialog = false },
+            title = { 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Organize Sub-tasks")
+                }
+            },
+            text = {
+                Column {
+                                            Text(
+                            text = "This will help you start fresh with your sub-tasks.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "All current sub-tasks will be removed, but this can help you reorganize your work more effectively. Would you like to continue?",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        currentDefect = currentDefect.copy(subTasks = emptyList())
+                        onDefectUpdate(currentDefect)
+                        showRemoveAllDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Start Fresh")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveAllDialog = false }) {
                     Text("Cancel")
                 }
             }

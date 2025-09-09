@@ -19,11 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.Defect
-import com.example.movein.data.DefectCategory
-import com.example.movein.data.DefectStatus
-import com.example.movein.data.Priority
-import com.example.movein.data.UserData
+import com.example.movein.shared.data.Defect
+import com.example.movein.shared.data.DefectCategory
+import com.example.movein.shared.data.DefectStatus
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.UserData
 import java.util.*
 import java.util.Calendar
 import com.example.movein.utils.getTodayString
@@ -31,9 +31,15 @@ import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.formatPriority
+import com.example.movein.utils.formatDateForDisplay
 import com.example.movein.utils.PermissionUtils
 import com.example.movein.utils.rememberPermissionState
+import com.example.movein.utils.ImageUtils
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.movein.ui.components.EnhancedDatePicker
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +65,36 @@ fun AddEditDefectScreen(
     var selectedImages by remember { mutableStateOf(defect?.images ?: emptyList<String>()) }
     
     val isEditing = defect != null
+    
+    val context = LocalContext.current
+    
+    // Permission state
+    val hasPermission = rememberPermissionState(
+        onPermissionGranted = { },
+        onPermissionDenied = { }
+    )
+    
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            // Image captured successfully
+            val timestamp = System.currentTimeMillis()
+            selectedImages = selectedImages + "Camera_${timestamp}.jpg"
+        }
+    }
+    
+    // Gallery launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            // Image selected successfully
+            val timestamp = System.currentTimeMillis()
+            selectedImages = selectedImages + "Gallery_${timestamp}.jpg"
+        }
+    }
     
     // Generate location options based on user data
     val locationOptions = remember(userData) {
@@ -280,7 +316,7 @@ fun AddEditDefectScreen(
                 )
                 
                 OutlinedTextField(
-                    value = selectedDueDate ?: "No due date set",
+                    value = formatDateForDisplay(selectedDueDate),
                     onValueChange = { },
                     modifier = Modifier.fillMaxWidth(),
                     readOnly = true,
@@ -361,9 +397,18 @@ fun AddEditDefectScreen(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    // Simulate camera photo capture
-                                    val timestamp = System.currentTimeMillis()
-                                    selectedImages = selectedImages + "IMG_${timestamp}_camera.jpg"
+                                    if (PermissionUtils.hasCameraPermission(context)) {
+                                        try {
+                                            val imageFile = ImageUtils.createImageFile(context)
+                                            val imageUri = ImageUtils.getImageUri(context, imageFile)
+                                            cameraLauncher.launch(imageUri)
+                                        } catch (e: Exception) {
+                                            // Handle error
+                                        }
+                                    } else {
+                                        // Request camera permission
+                                        hasPermission.value = false
+                                    }
                                 }
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = "Take Photo")
@@ -373,9 +418,12 @@ fun AddEditDefectScreen(
                             
                             OutlinedButton(
                                 onClick = {
-                                    // Simulate gallery photo selection
-                                    val timestamp = System.currentTimeMillis()
-                                    selectedImages = selectedImages + "IMG_${timestamp}_gallery.jpg"
+                                    if (PermissionUtils.hasStoragePermission(context)) {
+                                        galleryLauncher.launch("image/*")
+                                    } else {
+                                        // Request storage permission
+                                        hasPermission.value = false
+                                    }
                                 }
                             ) {
                                 Icon(Icons.Default.Check, contentDescription = "Select from Gallery")
@@ -556,63 +604,13 @@ fun AddEditDefectScreen(
         }
         
         if (showDueDateDialog) {
-            AlertDialog(
-                onDismissRequest = { showDueDateDialog = false },
-                title = { Text("Select Due Date") },
-                text = {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            OutlinedButton(
-                                onClick = { 
-                                    selectedDueDate = getTodayString()
-                                    showDueDateDialog = false
-                                }
-                            ) {
-                                Text("Today")
-                            }
-                            
-                            OutlinedButton(
-                                onClick = { 
-                                    selectedDueDate = getTomorrowString()
-                                    showDueDateDialog = false
-                                }
-                            ) {
-                                Text("Tomorrow")
-                            }
-                            
-                            OutlinedButton(
-                                onClick = { 
-                                    selectedDueDate = getNextWeekString()
-                                    showDueDateDialog = false
-                                }
-                            ) {
-                                Text("Next Week")
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        OutlinedButton(
-                            onClick = { 
-                                selectedDueDate = null
-                                showDueDateDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("No Due Date")
-                        }
-                    }
+            EnhancedDatePicker(
+                selectedDate = selectedDueDate,
+                onDateSelected = { date ->
+                    selectedDueDate = date
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = { showDueDateDialog = false }
-                    ) {
-                        Text("Cancel")
-                    }
-                }
+                onDismiss = { showDueDateDialog = false },
+                title = "Select Due Date"
             )
         }
         

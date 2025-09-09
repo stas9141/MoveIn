@@ -15,18 +15,21 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.ChecklistData
-import com.example.movein.data.ChecklistItem
-import com.example.movein.data.Priority
-import com.example.movein.data.Defect
+import com.example.movein.shared.data.ChecklistData
+import com.example.movein.shared.data.ChecklistItem
+import com.example.movein.shared.data.Priority
+import com.example.movein.shared.data.Defect
 import com.example.movein.ui.components.PriorityDropdown
+import com.example.movein.ui.components.TaskStatusDropdown
 import com.example.movein.utils.formatPriority
+import com.example.movein.utils.formatTaskStatus
 
 @Composable
 fun DashboardScreen(
@@ -37,6 +40,7 @@ fun DashboardScreen(
     onAddTask: (ChecklistItem) -> Unit,
     onSettingsClick: () -> Unit,
     onDefectListClick: () -> Unit = {},
+    onCalendarClick: () -> Unit = {},
     onTabSelected: (Int) -> Unit = {},
     defects: List<Defect> = emptyList(),
     modifier: Modifier = Modifier
@@ -102,12 +106,14 @@ fun DashboardScreen(
     // Calculate additional summary statistics
     val today = java.time.LocalDate.now()
     val overdueTasks = filteredTasks.count { task ->
-        task.dueDate != null && !task.isCompleted && 
-        parseDate(task.dueDate)?.isBefore(today) == true
+        val dueDate = task.dueDate
+        dueDate != null && !task.isCompleted && 
+        parseDate(dueDate)?.isBefore(today) == true
     }
     val dueThisWeek = filteredTasks.count { task ->
-        task.dueDate != null && !task.isCompleted && 
-        parseDate(task.dueDate)?.isBefore(today.plusDays(7)) == true
+        val dueDate = task.dueDate
+        dueDate != null && !task.isCompleted && 
+        parseDate(dueDate)?.isBefore(today.plusDays(7)) == true
     }
     val highPriorityTasks = filteredTasks.count { task ->
         !task.isCompleted && task.priority == Priority.HIGH
@@ -314,7 +320,16 @@ fun DashboardScreen(
                     }
                 }
                 
-
+                // Calendar Button
+                IconButton(
+                    onClick = onCalendarClick,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = "Calendar")
+                }
                 
                 // Settings Button
                 IconButton(
@@ -512,6 +527,13 @@ fun DashboardScreen(
                             onPriorityChange = { newPriority ->
                                 val updatedTask = task.copy(priority = newPriority)
                                 onTaskToggle(updatedTask)
+                            },
+                            onStatusChange = { newStatus ->
+                                val updatedTask = task.copy(
+                                    status = newStatus,
+                                    isCompleted = newStatus == com.example.movein.shared.data.TaskStatus.CLOSED
+                                )
+                                onTaskToggle(updatedTask)
                             }
                         )
                     }
@@ -648,7 +670,8 @@ fun ChecklistItemCard(
     task: ChecklistItem,
     onClick: () -> Unit,
     onToggle: () -> Unit,
-    onPriorityChange: (Priority) -> Unit
+    onPriorityChange: (Priority) -> Unit,
+    onStatusChange: (com.example.movein.shared.data.TaskStatus) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -668,8 +691,17 @@ fun ChecklistItemCard(
             ) {
                 // Checkbox
                 Checkbox(
-                    checked = task.isCompleted,
-                    onCheckedChange = { onToggle() },
+                    checked = task.isCompleted || task.status == com.example.movein.shared.data.TaskStatus.CLOSED,
+                    onCheckedChange = { isChecked ->
+                        if (isChecked) {
+                            // If checking, set status to CLOSED and isCompleted to true
+                            onStatusChange(com.example.movein.shared.data.TaskStatus.CLOSED)
+                        } else {
+                            // If unchecking, set status to OPEN and isCompleted to false
+                            onStatusChange(com.example.movein.shared.data.TaskStatus.OPEN)
+                        }
+                        onToggle()
+                    },
                     modifier = Modifier.padding(end = 12.dp)
                 )
                 
@@ -698,6 +730,14 @@ fun ChecklistItemCard(
                             text = task.category,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        // Task Status dropdown
+                        TaskStatusDropdown(
+                            currentStatus = task.status,
+                            onStatusChange = onStatusChange
                         )
                         
                         Spacer(modifier = Modifier.width(8.dp))

@@ -14,14 +14,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.movein.data.ChecklistItem
-import com.example.movein.data.Priority
+import com.example.movein.shared.data.ChecklistItem
+import com.example.movein.shared.data.Priority
 import java.util.UUID
 import java.util.Calendar
 import com.example.movein.utils.getTodayString
 import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
 import com.example.movein.utils.formatPriority
+import com.example.movein.utils.formatDateForDisplay
+import com.example.movein.ui.components.EnhancedDatePicker
 
 @Composable
 fun AddTaskDialog(
@@ -172,7 +174,7 @@ fun AddTaskDialog(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = selectedDueDate ?: "Select due date",
+                                text = formatDateForDisplay(selectedDueDate),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (selectedDueDate != null) {
                                     MaterialTheme.colorScheme.primary
@@ -306,202 +308,14 @@ fun AddTaskDialog(
     
     // Due Date Selection Dialog
     if (showDueDateDialog) {
-        var currentMonth by remember { mutableStateOf(0) } // 0 = current month
-        
-        AlertDialog(
-            onDismissRequest = { showDueDateDialog = false },
-            title = { Text("Set Due Date") },
-            text = {
-                Column {
-                    // Calendar Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = { currentMonth-- }
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous Month")
-                        }
-                        
-                        Text(
-                            text = getMonthYearString(currentMonth),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        IconButton(
-                            onClick = { currentMonth++ }
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Month")
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Calendar Grid
-                    CalendarGrid(
-                        currentMonth = currentMonth,
-                        selectedDate = selectedDueDate ?: "",
-                        onDateSelected = { date ->
-                            selectedDueDate = date
-                        }
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Quick Actions
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        TextButton(
-                            onClick = { selectedDueDate = getTodayString() }
-                        ) {
-                            Text("Today")
-                        }
-                        TextButton(
-                            onClick = { selectedDueDate = getTomorrowString() }
-                        ) {
-                            Text("Tomorrow")
-                        }
-                        TextButton(
-                            onClick = { selectedDueDate = getNextWeekString() }
-                        ) {
-                            Text("Next Week")
-                        }
-                    }
-                }
+        EnhancedDatePicker(
+            selectedDate = selectedDueDate,
+            onDateSelected = { date ->
+                selectedDueDate = date
             },
-            confirmButton = {
-                TextButton(
-                    onClick = { showDueDateDialog = false },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text("Set")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { 
-                        selectedDueDate = null
-                        showDueDateDialog = false 
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Clear")
-                }
-            }
+            onDismiss = { showDueDateDialog = false },
+            title = "Set Due Date"
         )
     }
 }
 
-// Calendar Helper Functions
-fun getMonthYearString(monthOffset: Int): String {
-    val calendar = Calendar.getInstance()
-    calendar.add(Calendar.MONTH, monthOffset)
-    val month = calendar.get(Calendar.MONTH)
-    val year = calendar.get(Calendar.YEAR)
-    val monthNames = listOf("January", "February", "March", "April", "May", "June",
-                           "July", "August", "September", "October", "November", "December")
-    return "${monthNames[month]} $year"
-}
-
-
-
-@Composable
-fun CalendarGrid(
-    currentMonth: Int,
-    selectedDate: String,
-    onDateSelected: (String) -> Unit
-) {
-    val calendar = Calendar.getInstance()
-    calendar.add(Calendar.MONTH, currentMonth)
-    calendar.set(Calendar.DAY_OF_MONTH, 1)
-    
-    val firstDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1 // 0 = Sunday
-    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-    
-    Column {
-        // Day headers
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                Text(
-                    text = day,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-        }
-        
-        // Calendar days
-        var dayCount = 1
-        for (week in 0..5) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                for (dayOfWeek in 0..6) {
-                    if (week == 0 && dayOfWeek < firstDayOfWeek) {
-                        // Empty space for days before the first day of the month
-                        Box(modifier = Modifier.padding(8.dp)) {}
-                    } else if (dayCount <= daysInMonth) {
-                        val currentDate = String.format(
-                            "%02d/%02d/%04d",
-                            calendar.get(Calendar.MONTH) + 1,
-                            dayCount,
-                            calendar.get(Calendar.YEAR)
-                        )
-                        
-                        val isSelected = selectedDate == currentDate
-                        val isToday = currentDate == getTodayString()
-                        
-                        Box(
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .size(32.dp)
-                                .clickable { onDateSelected(currentDate) }
-                        ) {
-                            Surface(
-                                color = when {
-                                    isSelected -> MaterialTheme.colorScheme.primary
-                                    isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                    else -> MaterialTheme.colorScheme.surface
-                                },
-                                shape = CircleShape,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = dayCount.toString(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = when {
-                                            isSelected -> MaterialTheme.colorScheme.onPrimary
-                                            isToday -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.onSurface
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        dayCount++
-                    } else {
-                        // Empty space for days after the last day of the month
-                        Box(modifier = Modifier.padding(8.dp)) {}
-                    }
-                }
-            }
-        }
-    }
-}

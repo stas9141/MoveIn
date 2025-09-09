@@ -14,12 +14,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.movein.ui.components.SimpleSyncStatusCard
+import com.example.movein.shared.cloud.AuthState
+import com.example.movein.shared.cloud.SyncStatus
 
 @Composable
 fun SettingsScreen(
     isDarkMode: Boolean,
     onDarkModeToggle: (Boolean) -> Unit,
     onBackClick: () -> Unit,
+    onReorganizeTasks: () -> Unit,
+    onClearData: () -> Unit,
+    onGenerateReport: () -> Unit,
+    authState: AuthState,
+    syncStatus: SyncStatus,
+    onForceSync: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var notificationsEnabled by remember { mutableStateOf(true) }
@@ -169,6 +179,132 @@ fun SettingsScreen(
                 }
             }
             
+            // Cloud Sync Section
+            item {
+                SimpleSyncStatusCard(
+                    authState = authState,
+                    syncStatus = syncStatus,
+                    onForceSync = onForceSync,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            
+            // Authentication Section
+            if (authState.isAuthenticated) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Account",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Text(
+                                text = "Signed in as: ${authState.email ?: "Unknown"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Button(
+                                onClick = onSignOut,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "Sign Out",
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Clear Data Section
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Data Management",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Button(
+                            onClick = onReorganizeTasks,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Reorganize Tasks by Due Date",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Button(
+                            onClick = onGenerateReport,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Generate Defect Report",
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Button(
+                            onClick = onClearData,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Clear All Data",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        
+                        Text(
+                            text = "Reorganize: Moves tasks to correct hosts based on due dates. Clear: Removes all data.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
+            
             // About Section
             item {
                 Card(
@@ -204,7 +340,7 @@ fun SettingsScreen(
                         )
                         
                         Text(
-                            text = "A comprehensive app to help you organize your apartment move-in process with personalized checklists.",
+                            text = "MoveIn is the essential companion for new apartment owners. From the moment you receive your keys, our app helps you transform your new space into a home. It guides you through the entire process with smart, pre-populated task lists, from setting up utilities to decorating. More importantly, our powerful defect management system allows you to effortlessly document and track any issues, complete with photos and specific locations, ensuring you get everything resolved with the building company. Stay organized, manage your to-dos, and get peace of mind with the only app designed to make your move-in process seamless and stress-free.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
