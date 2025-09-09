@@ -30,6 +30,7 @@ import com.example.movein.shared.data.DefectCategory
 import com.example.movein.shared.data.DefectStatus
 import com.example.movein.shared.data.Priority
 import com.example.movein.shared.data.SubTask
+import com.example.movein.utils.formatDateForDisplay
 import com.example.movein.ui.components.PriorityDropdown
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.formatPriority
@@ -383,6 +384,16 @@ fun DefectCard(
                         },
                         maxLines = 2
                     )
+                    
+                    // Show closed date if defect is closed
+                    if (defect.status == DefectStatus.CLOSED && defect.closedAt != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Closed on ${formatDateForDisplay(defect.closedAt)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                 }
                 
                 // Status text and icon in top right corner

@@ -4,12 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
@@ -28,10 +37,27 @@ import com.example.movein.ui.screens.SimpleLoginScreen
 import com.example.movein.ui.screens.SimpleSignUpScreen
 import com.example.movein.ui.screens.ReportConfigurationScreen
 import com.example.movein.ui.theme.MoveInTheme
+import com.example.movein.ui.components.SimpleTutorialDialog
+import com.example.movein.ui.components.rememberSimpleTutorialState
+import com.example.movein.ui.components.BottomNavigationBar
 import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
 import com.example.movein.auth.GoogleSignInHelper
 import com.google.firebase.FirebaseApp
+
+private fun shouldShowBottomNavigation(currentScreen: Screen): Boolean {
+    return when (currentScreen) {
+        Screen.Dashboard,
+        Screen.Calendar,
+        Screen.DefectList,
+        Screen.Settings,
+        is Screen.TaskDetail,
+        is Screen.DefectDetail,
+        is Screen.AddEditDefect,
+        Screen.ReportConfiguration -> true
+        else -> false
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +100,12 @@ fun MoveInApp() {
         state
     }
     
+    // Tutorial system
+    val tutorialState = rememberSimpleTutorialState()
+    
+    // FAB state for Dashboard
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+    
     // Get the activity for Google Sign-In
     val activity = context as? ComponentActivity
     val googleSignInHelper = remember(activity) { 
@@ -84,8 +116,38 @@ fun MoveInApp() {
         }
     }
     
+    // Handle system back button
+    BackHandler(enabled = appState.canNavigateBack()) {
+        appState.navigateBack()
+    }
+    
     MoveInTheme(darkTheme = appState.isDarkMode) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                // Show bottom navigation for main screens only
+                if (shouldShowBottomNavigation(appState.currentScreen)) {
+                    BottomNavigationBar(
+                        currentScreen = appState.currentScreen,
+                        onNavigateTo = { screen -> appState.navigateTo(screen) }
+                    )
+                }
+            },
+            floatingActionButton = {
+                // Show FAB for Dashboard screen
+                if (appState.currentScreen == Screen.Dashboard) {
+                    FloatingActionButton(
+                        onClick = {
+                            showAddTaskDialog = true
+                        },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Task")
+                    }
+                }
+            }
+        ) { innerPadding ->
         when (appState.currentScreen) {
             Screen.Welcome -> {
                 WelcomeScreen(
@@ -95,6 +157,12 @@ fun MoveInApp() {
                     onSignInClick = {
                         appState.navigateTo(Screen.Login)
                     },
+                onTutorialClick = {
+                    tutorialState.showTutorial(
+                        "Welcome to MoveIn!", 
+                        "Your comprehensive home inspection and move-in companion. Navigate through the app to track tasks, defects, and manage your move-in process."
+                    )
+                },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -185,7 +253,10 @@ fun MoveInApp() {
                         },
                         onAddTask = { newTask ->
                             appState.addTask(newTask)
+                            showAddTaskDialog = false
                         },
+                        showAddTaskDialog = showAddTaskDialog,
+                        onDismissAddTaskDialog = { showAddTaskDialog = false },
                         onSettingsClick = {
                             appState.navigateTo(Screen.Settings)
                         },
@@ -194,6 +265,12 @@ fun MoveInApp() {
                         },
                         onCalendarClick = {
                             appState.navigateTo(Screen.Calendar)
+                        },
+                        onTutorialClick = {
+                            tutorialState.showTutorial(
+                                "Dashboard Overview", 
+                                "Your main hub for tracking tasks and defects. View your progress across different timeframes: First Week, First Month, and First Year. Use the floating action button to add new tasks."
+                            )
                         },
                         defects = appState.defects,
                         modifier = Modifier.padding(innerPadding)
@@ -233,6 +310,12 @@ fun MoveInApp() {
                     },
                     onGenerateReport = {
                         appState.navigateTo(Screen.ReportConfiguration)
+                    },
+                    onTutorialClick = {
+                        tutorialState.showTutorial(
+                            "Settings & Features", 
+                            "Manage your preferences, sync data across devices, generate defect reports, and customize your MoveIn experience. Access cloud sync and report generation from here."
+                        )
                     },
                     authState = appState.authState,
                     syncStatus = appState.syncStatus,
@@ -348,5 +431,13 @@ fun MoveInApp() {
             }
         }
         }
+        
+        // Tutorial Dialog
+        SimpleTutorialDialog(
+            isVisible = tutorialState.isVisible,
+            title = tutorialState.title,
+            description = tutorialState.description,
+            onClose = { tutorialState.closeTutorial() }
+        )
     }
 }

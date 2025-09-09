@@ -36,9 +36,9 @@ fun ReportConfigurationScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
-    val buildingCompanyManager = remember { BuildingCompanyManager(context) }
-    val reportGenerator = remember { DefectReportGenerator(context) }
-    val emailService = remember { EmailService(context) }
+    val buildingCompanyManager = remember(context) { BuildingCompanyManager(context) }
+    val reportGenerator = remember(context) { DefectReportGenerator(context) }
+    val emailService = remember(context) { EmailService(context) }
     
     var selectedCompany by remember { mutableStateOf<BuildingCompany?>(null) }
     var reportConfig by remember { 
@@ -47,6 +47,8 @@ fun ReportConfigurationScreen(
     var isGeneratingReport by remember { mutableStateOf(false) }
     var showCompanyDialog by remember { mutableStateOf(false) }
     var newCompany by remember { mutableStateOf(BuildingCompany(name = "", email = "")) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showErrorDialog by remember { mutableStateOf(false) }
     
     val companies by buildingCompanyManager.companies.collectAsState()
     
@@ -287,6 +289,7 @@ fun ReportConfigurationScreen(
                         onClick = {
                             coroutineScope.launch {
                                 isGeneratingReport = true
+                                errorMessage = null
                                 try {
                                     val updatedConfig = reportConfig.copy(
                                         buildingCompanyName = selectedCompany?.name ?: "",
@@ -303,16 +306,28 @@ fun ReportConfigurationScreen(
                                             SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(Date())
                                         )
                                         
-                                        emailService.sendDefectReport(
-                                            EmailService.EmailConfig(
-                                                recipientEmail = company.email,
-                                                recipientName = company.name,
-                                                subject = "Defect Report - ${SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date())}",
-                                                body = emailBody,
-                                                attachmentFile = reportFile
+                                        // Send email on main thread
+                                        try {
+                                            emailService.sendDefectReport(
+                                                EmailService.EmailConfig(
+                                                    recipientEmail = company.email,
+                                                    recipientName = company.name,
+                                                    subject = "Defect Report - ${SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date())}",
+                                                    body = emailBody,
+                                                    attachmentFile = reportFile
+                                                )
                                             )
-                                        )
+                                        } catch (e: Exception) {
+                                            // Handle email sending errors gracefully
+                                            errorMessage = "Failed to send email: ${e.message}"
+                                            showErrorDialog = true
+                                            e.printStackTrace()
+                                        }
                                     }
+                                } catch (e: Exception) {
+                                    errorMessage = "Failed to generate report: ${e.message}"
+                                    showErrorDialog = true
+                                    e.printStackTrace()
                                 } finally {
                                     isGeneratingReport = false
                                 }
@@ -337,12 +352,17 @@ fun ReportConfigurationScreen(
                         onClick = {
                             coroutineScope.launch {
                                 isGeneratingReport = true
+                                errorMessage = null
                                 try {
                                     val updatedConfig = reportConfig.copy(
                                         buildingCompanyName = selectedCompany?.name ?: "",
                                         buildingCompanyEmail = selectedCompany?.email ?: ""
                                     )
                                     reportGenerator.generateDefectReport(defects, updatedConfig)
+                                } catch (e: Exception) {
+                                    errorMessage = "Failed to generate PDF: ${e.message}"
+                                    showErrorDialog = true
+                                    e.printStackTrace()
                                 } finally {
                                     isGeneratingReport = false
                                 }
@@ -409,6 +429,20 @@ fun ReportConfigurationScreen(
             dismissButton = {
                 TextButton(onClick = { showCompanyDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Error Dialog
+    if (showErrorDialog && errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("Error") },
+            text = { Text(errorMessage!!) },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("OK")
                 }
             }
         )

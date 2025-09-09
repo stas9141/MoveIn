@@ -41,28 +41,39 @@ class DefectReportGenerator(private val context: Context) {
         defects: List<Defect>,
         config: ReportConfig = ReportConfig()
     ): File = withContext(Dispatchers.IO) {
-        val fileName = "defect_report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf"
-        val file = File(context.getExternalFilesDir(null), fileName)
-        
-        val filteredDefects = if (config.includeClosedDefects) {
-            defects
-        } else {
-            defects.filter { it.status != DefectStatus.CLOSED }
-        }
-        
-        val htmlContent = generateHtmlReport(filteredDefects, config)
-        
-        val pdfWriter = PdfWriter(FileOutputStream(file))
-        val pdfDocument = PdfDocument(pdfWriter)
-        val document = Document(pdfDocument)
-        
         try {
-            HtmlConverter.convertToPdf(htmlContent, pdfWriter)
-        } finally {
-            document.close()
+            val fileName = "defect_report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf"
+            val externalDir = context.getExternalFilesDir(null)
+            val file = if (externalDir != null) {
+                File(externalDir, fileName)
+            } else {
+                // Fallback to internal storage
+                File(context.filesDir, fileName)
+            }
+            
+            val filteredDefects = if (config.includeClosedDefects) {
+                defects
+            } else {
+                defects.filter { it.status != DefectStatus.CLOSED }
+            }
+            
+            val htmlContent = generateHtmlReport(filteredDefects, config)
+            
+            val pdfWriter = PdfWriter(FileOutputStream(file))
+            val pdfDocument = PdfDocument(pdfWriter)
+            val document = Document(pdfDocument)
+            
+            try {
+                HtmlConverter.convertToPdf(htmlContent, pdfWriter)
+            } finally {
+                document.close()
+            }
+            
+            file
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
         }
-        
-        file
     }
     
     private fun generateHtmlReport(defects: List<Defect>, config: ReportConfig): String {

@@ -209,6 +209,16 @@ fun DefectDetailScreen(
                             }
                         }
                         
+                        // Show closed date if defect is closed
+                        if (currentDefect.status == DefectStatus.CLOSED && currentDefect.closedAt != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Closed on ${formatDateForDisplay(currentDefect.closedAt)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                        
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Text(

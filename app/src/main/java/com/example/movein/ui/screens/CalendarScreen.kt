@@ -574,6 +574,15 @@ private fun DefectItem(
                         )
                     }
                 }
+                
+                // Show closed date if defect is closed
+                if (defect.status == DefectStatus.CLOSED && defect.closedAt != null) {
+                    Text(
+                        text = "Closed: ${formatDateForDisplay(defect.closedAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             PriorityIndicator(priority = defect.priority)
         }

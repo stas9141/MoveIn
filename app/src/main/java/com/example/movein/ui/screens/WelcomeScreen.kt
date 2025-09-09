@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 fun WelcomeScreen(
     onGetStartedClick: () -> Unit,
     onSignInClick: () -> Unit,
+    onTutorialClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -90,6 +91,23 @@ fun WelcomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Tutorial Button
+        onTutorialClick?.let { onTutorial ->
+            TextButton(
+                onClick = onTutorial,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "📚 Take a Quick Tour",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
         }
     }
 }

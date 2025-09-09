@@ -7,11 +7,13 @@ import com.example.movein.shared.data.ChecklistData
 import com.example.movein.shared.data.ChecklistItem
 import com.example.movein.shared.data.UserData
 import com.example.movein.shared.data.Defect
+import com.example.movein.shared.data.DefectStatus
 import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
 import com.example.movein.shared.cloud.AuthState
 import com.example.movein.shared.cloud.SyncStatus
 import com.example.movein.navigation.Screen
+import com.example.movein.utils.getTodayString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,6 +25,8 @@ class AppState(
 ) {
     var currentScreen by mutableStateOf<Screen>(Screen.Welcome)
         private set
+    
+    private val navigationStack = mutableListOf<Screen>()
     
     var userData by mutableStateOf<UserData?>(null)
         private set
@@ -121,7 +125,28 @@ class AppState(
     }
 
     fun navigateTo(screen: Screen) {
+        // Add current screen to navigation stack if it's not already there
+        if (navigationStack.isEmpty() || navigationStack.last() != currentScreen) {
+            navigationStack.add(currentScreen)
+        }
         currentScreen = screen
+    }
+    
+    fun navigateBack(): Boolean {
+        return if (navigationStack.isNotEmpty()) {
+            currentScreen = navigationStack.removeAt(navigationStack.size - 1)
+            true
+        } else {
+            false
+        }
+    }
+    
+    fun canNavigateBack(): Boolean {
+        return navigationStack.isNotEmpty()
+    }
+    
+    fun clearNavigationStack() {
+        navigationStack.clear()
     }
 
     fun initializeUserData(data: UserData) {
@@ -215,7 +240,16 @@ class AppState(
     }
     
     fun updateDefect(updatedDefect: Defect) {
-        defects = defects.map { if (it.id == updatedDefect.id) updatedDefect else it }
+        // Check if status is changing to CLOSED and set closedAt date
+        val originalDefect = defects.find { it.id == updatedDefect.id }
+        val finalDefect = if (originalDefect?.status != DefectStatus.CLOSED && 
+                             updatedDefect.status == DefectStatus.CLOSED) {
+            updatedDefect.copy(closedAt = getTodayString())
+        } else {
+            updatedDefect
+        }
+        
+        defects = defects.map { if (it.id == finalDefect.id) finalDefect else it }
         appStorage?.saveDefects(defects)
         
         // Sync to cloud if authenticated

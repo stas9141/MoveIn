@@ -42,12 +42,14 @@ fun DashboardScreen(
     onDefectListClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onTabSelected: (Int) -> Unit = {},
+    onTutorialClick: (() -> Unit)? = null,
     defects: List<Defect> = emptyList(),
+    showAddTaskDialog: Boolean = false,
+    onDismissAddTaskDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(selectedTabIndex) }
     var showFilterDialog by remember { mutableStateOf(false) }
-    var showAddTaskDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedPriority by remember { mutableStateOf<Priority?>(null) }
     
@@ -68,16 +70,16 @@ fun DashboardScreen(
     }
     
     val dismissAddTaskDialog = {
-        showAddTaskDialog = false
+        onDismissAddTaskDialog()
     }
     
     val addNewTask = { newTask: ChecklistItem ->
         onAddTask(newTask)
-        showAddTaskDialog = false
+        onDismissAddTaskDialog()
     }
     
     val openAddTaskDialog = {
-        showAddTaskDialog = true
+        // This will be handled by the FAB in MainActivity
     }
     
 
@@ -138,13 +140,35 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        text = "Welcome to your new home!",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    // Header with title and tutorial button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Welcome to your new home!",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        // Tutorial button
+                        onTutorialClick?.let { onTutorial ->
+                            IconButton(
+                                onClick = onTutorial,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Start Tutorial",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
@@ -628,17 +652,7 @@ fun DashboardScreen(
             }
         }
         
-        // Add Task Button - Floating over the content
-        FloatingActionButton(
-            onClick = openAddTaskDialog,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Task")
-        }
+        // FAB is now handled by the main Scaffold in MainActivity
         
         // Filter Dialog
         if (showFilterDialog) {

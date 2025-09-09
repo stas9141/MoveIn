@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ fun SettingsScreen(
     onReorganizeTasks: () -> Unit,
     onClearData: () -> Unit,
     onGenerateReport: () -> Unit,
+    onTutorialClick: (() -> Unit)? = null,
     authState: AuthState,
     syncStatus: SyncStatus,
     onForceSync: () -> Unit,
@@ -52,8 +54,21 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .weight(1f)
             )
+            
+            // Tutorial button
+            onTutorialClick?.let { onTutorial ->
+                IconButton(onClick = onTutorial) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Start Tutorial",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
         
         // Settings Content

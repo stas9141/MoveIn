@@ -17,35 +17,56 @@ class EmailService(private val context: Context) {
     )
     
     fun sendDefectReport(config: EmailConfig) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "message/rfc822"
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(config.recipientEmail))
-            putExtra(Intent.EXTRA_SUBJECT, config.subject)
-            putExtra(Intent.EXTRA_TEXT, config.body)
-            
-            // Add attachment if provided
-            config.attachmentFile?.let { file ->
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        }
-        
-        // Check if there's an email app available
-        if (intent.resolveActivity(context.packageManager) != null) {
-            context.startActivity(Intent.createChooser(intent, "Send Defect Report"))
-        } else {
-            // Fallback: open email app with pre-filled data
-            val fallbackIntent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.parse("mailto:${config.recipientEmail}")
+        try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "message/rfc822"
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(config.recipientEmail))
                 putExtra(Intent.EXTRA_SUBJECT, config.subject)
                 putExtra(Intent.EXTRA_TEXT, config.body)
+                
+                // Add attachment if provided
+                config.attachmentFile?.let { file ->
+                    try {
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file
+                        )
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e: Exception) {
+                        // If file provider fails, continue without attachment
+                        e.printStackTrace()
+                    }
+                }
             }
-            context.startActivity(fallbackIntent)
+            
+            // Check if there's an email app available
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(Intent.createChooser(intent, "Send Defect Report"))
+            } else {
+                // Fallback: open email app with pre-filled data
+                val fallbackIntent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:${config.recipientEmail}")
+                    putExtra(Intent.EXTRA_SUBJECT, config.subject)
+                    putExtra(Intent.EXTRA_TEXT, config.body)
+                }
+                context.startActivity(fallbackIntent)
+            }
+        } catch (e: Exception) {
+            // Handle any unexpected errors
+            e.printStackTrace()
+            // Try fallback without attachment
+            try {
+                val fallbackIntent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:${config.recipientEmail}")
+                    putExtra(Intent.EXTRA_SUBJECT, config.subject)
+                    putExtra(Intent.EXTRA_TEXT, config.body)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (fallbackException: Exception) {
+                fallbackException.printStackTrace()
+            }
         }
     }
     
