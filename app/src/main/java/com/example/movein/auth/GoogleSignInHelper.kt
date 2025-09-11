@@ -27,28 +27,40 @@ class GoogleSignInHelper(private val activity: ComponentActivity) {
     
     fun signInWithGoogle(onResult: (Result<Unit>) -> Unit) {
         onSignInResult = onResult
-        startGoogleSignIn()
+        try {
+            startGoogleSignIn()
+        } catch (e: Exception) {
+            onResult(Result.failure(Exception("Google Sign-In setup error: ${e.message}")))
+        }
     }
     
     private fun startGoogleSignIn() {
-        val signInRequest = BeginSignInRequest.builder()
-            .setGoogleIdTokenRequestOptions(
-                BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
-                    .setSupported(true)
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId("123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com") // Replace with your actual client ID
-                    .build()
-            )
-            .build()
-        
-        oneTapClient.beginSignIn(signInRequest)
-            .addOnSuccessListener { result ->
-                val intentSenderRequest = IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
-                signInLauncher.launch(intentSenderRequest)
-            }
-            .addOnFailureListener { exception ->
-                onSignInResult?.invoke(Result.failure(exception))
-            }
+        try {
+            val signInRequest = BeginSignInRequest.builder()
+                .setGoogleIdTokenRequestOptions(
+                    BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
+                        .setSupported(true)
+                        .setFilterByAuthorizedAccounts(false)
+                        .setServerClientId("123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com") // TODO: Replace with real client ID from google-services.json
+                        .build()
+                )
+                .build()
+            
+            oneTapClient.beginSignIn(signInRequest)
+                .addOnSuccessListener { result ->
+                    try {
+                        val intentSenderRequest = IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
+                        signInLauncher.launch(intentSenderRequest)
+                    } catch (e: Exception) {
+                        onSignInResult?.invoke(Result.failure(Exception("Failed to launch Google Sign-In: ${e.message}")))
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    onSignInResult?.invoke(Result.failure(Exception("Google Sign-In failed: ${exception.message}")))
+                }
+        } catch (e: Exception) {
+            onSignInResult?.invoke(Result.failure(Exception("Google Sign-In setup failed: ${e.message}")))
+        }
     }
     
     private fun handleSignInResult(data: Intent?) {

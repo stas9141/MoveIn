@@ -16,7 +16,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +35,7 @@ import com.example.movein.ui.components.TaskStatusDropdown
 import com.example.movein.utils.formatPriority
 import com.example.movein.utils.formatTaskStatus
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     checklistData: ChecklistData,
@@ -38,9 +43,7 @@ fun DashboardScreen(
     onTaskClick: (ChecklistItem) -> Unit,
     onTaskToggle: (ChecklistItem) -> Unit,
     onAddTask: (ChecklistItem) -> Unit,
-    onSettingsClick: () -> Unit,
     onDefectListClick: () -> Unit = {},
-    onCalendarClick: () -> Unit = {},
     onTabSelected: (Int) -> Unit = {},
     onTutorialClick: (() -> Unit)? = null,
     defects: List<Defect> = emptyList(),
@@ -51,16 +54,19 @@ fun DashboardScreen(
     var selectedTab by remember { mutableStateOf(selectedTabIndex) }
     var showFilterDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var selectedStatus by remember { mutableStateOf<com.example.movein.shared.data.TaskStatus?>(null) }
     var selectedPriority by remember { mutableStateOf<Priority?>(null) }
     
     // Callback functions for state updates
     val clearFilters = {
         selectedCategory = null
+        selectedStatus = null
         selectedPriority = null
     }
     
-    val applyFilters = { category: String?, priority: Priority? ->
+    val applyFilters = { category: String?, status: com.example.movein.shared.data.TaskStatus?, priority: Priority? ->
         selectedCategory = category
+        selectedStatus = status
         selectedPriority = priority
         showFilterDialog = false
     }
@@ -97,10 +103,11 @@ fun DashboardScreen(
     // Apply filters
     val filteredTasks = currentTasks.filter { task ->
         (selectedCategory == null || task.category == selectedCategory) &&
+        (selectedStatus == null || task.status == selectedStatus) &&
         (selectedPriority == null || task.priority == selectedPriority)
     }
     
-    // Separate active and completed tasks
+    // Keep tasks in their original order (don't separate active/completed)
     val activeTasks = filteredTasks.filter { !it.isCompleted }
     val completedTasks = filteredTasks.filter { it.isCompleted }
     val totalTasks = filteredTasks.size
@@ -320,16 +327,27 @@ fun DashboardScreen(
                     }
                 }
                 
-                // Filter Button with indicator
+                // Filter Button with indicator (keep only filter since it's not in bottom nav)
                 Box {
-                    IconButton(
-                        onClick = { showFilterDialog = true },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
+                    val tooltipState = rememberTooltipState()
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text("Filter tasks by category, status, and priority")
+                            }
+                        },
+                        state = tooltipState
                     ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Filter")
+                        IconButton(
+                            onClick = { showFilterDialog = true },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Filter")
+                        }
                     }
                     
                     // Show indicator if filters are active
@@ -342,28 +360,6 @@ fun DashboardScreen(
                                 .align(Alignment.TopEnd)
                         ) {}
                     }
-                }
-                
-                // Calendar Button
-                IconButton(
-                    onClick = onCalendarClick,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(Icons.Default.DateRange, contentDescription = "Calendar")
-                }
-                
-                // Settings Button
-                IconButton(
-                    onClick = onSettingsClick,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Settings")
                 }
             }
 
@@ -390,7 +386,7 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Settings,
+                                imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Active Filters",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
@@ -421,6 +417,36 @@ fun DashboardScreen(
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                         labelColor = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+                            
+                            selectedStatus?.let { status ->
+                                AssistChip(
+                                    onClick = { },
+                                    label = { Text(status.name.replace("_", " ")) },
+                                    leadingIcon = {
+                                        Surface(
+                                            color = when (status) {
+                                                com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
+                                                com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+                                                com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                            },
+                                            shape = MaterialTheme.shapes.small,
+                                            modifier = Modifier.size(16.dp)
+                                        ) {}
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = when (status) {
+                                            com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                                            com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+                                        },
+                                        labelColor = when (status) {
+                                            com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
+                                            com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+                                            com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                        }
                                     )
                                 )
                             }
@@ -547,7 +573,6 @@ fun DashboardScreen(
                         ChecklistItemCard(
                             task = task,
                             onClick = { onTaskClick(task) },
-                            onToggle = { onTaskToggle(task) },
                             onPriorityChange = { newPriority ->
                                 val updatedTask = task.copy(priority = newPriority)
                                 onTaskToggle(updatedTask)
@@ -604,6 +629,7 @@ fun DashboardScreen(
                                         task = task,
                                         onClick = { onTaskClick(task) }
                                     )
+                                    
                                     if (task != completedTasks.last()) {
                                         Spacer(modifier = Modifier.height(8.dp))
                                     }
@@ -660,6 +686,7 @@ fun DashboardScreen(
                 onDismiss = dismissFilterDialog,
                 onApplyFilters = applyFilters,
                 currentCategory = selectedCategory,
+                currentStatus = selectedStatus,
                 currentPriority = selectedPriority
             )
         }
@@ -683,7 +710,6 @@ fun DashboardScreen(
 fun ChecklistItemCard(
     task: ChecklistItem,
     onClick: () -> Unit,
-    onToggle: () -> Unit,
     onPriorityChange: (Priority) -> Unit,
     onStatusChange: (com.example.movein.shared.data.TaskStatus) -> Unit
 ) {
@@ -699,76 +725,89 @@ fun ChecklistItemCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Top row with title and status
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                // Checkbox
-                Checkbox(
-                    checked = task.isCompleted || task.status == com.example.movein.shared.data.TaskStatus.CLOSED,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            // If checking, set status to CLOSED and isCompleted to true
-                            onStatusChange(com.example.movein.shared.data.TaskStatus.CLOSED)
-                        } else {
-                            // If unchecking, set status to OPEN and isCompleted to false
-                            onStatusChange(com.example.movein.shared.data.TaskStatus.OPEN)
-                        }
-                        onToggle()
+                // Task title
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = if (task.isCompleted) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
                     },
-                    modifier = Modifier.padding(end = 12.dp)
+                    modifier = Modifier.weight(1f)
                 )
                 
-                // Task Details
-                Column(
-                    modifier = Modifier.weight(1f)
+                // Status in top-right corner
+                TaskStatusDropdown(
+                    currentStatus = task.status,
+                    onStatusChange = onStatusChange
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Task details row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Category
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    modifier = Modifier.padding(0.dp)
                 ) {
                     Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
+                        text = task.category,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
                         ),
-                        color = if (task.isCompleted) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
+                }
+                
+                // Priority
+                PriorityDropdown(
+                    currentPriority = task.priority,
+                    onPriorityChange = onPriorityChange
+                )
+                
+                // Due date if available
+                task.dueDate?.let { dueDate ->
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.padding(0.dp)
                     ) {
-                        Text(
-                            text = task.category,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        // Task Status dropdown
-                        TaskStatusDropdown(
-                            currentStatus = task.status,
-                            onStatusChange = onStatusChange
-                        )
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        // Priority dropdown
-                        PriorityDropdown(
-                            currentPriority = task.priority,
-                            onPriorityChange = onPriorityChange
-                        )
-                        
-                        // Due date if available
-                        task.dueDate?.let { dueDate ->
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Due date",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(14.dp)
+                            )
                             Text(
-                                text = "Due: $dueDate",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = dueDate,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
@@ -783,11 +822,13 @@ fun ChecklistItemCard(
 @Composable
 fun FilterDialog(
     onDismiss: () -> Unit,
-    onApplyFilters: (String?, Priority?) -> Unit,
+    onApplyFilters: (String?, com.example.movein.shared.data.TaskStatus?, Priority?) -> Unit,
     currentCategory: String?,
+    currentStatus: com.example.movein.shared.data.TaskStatus?,
     currentPriority: Priority?
 ) {
     var selectedCategory by remember { mutableStateOf(currentCategory) }
+    var selectedStatus by remember { mutableStateOf(currentStatus) }
     var selectedPriority by remember { mutableStateOf(currentPriority) }
     
     AlertDialog(
@@ -833,6 +874,87 @@ fun FilterDialog(
                         Text(
                             text = category,
                             modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Status filter
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Status",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    if (selectedStatus != null) {
+                        TextButton(
+                            onClick = { selectedStatus = null },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Clear", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                com.example.movein.shared.data.TaskStatus.values().forEach { status ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .clickable { selectedStatus = if (selectedStatus == status) null else status },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedStatus == status,
+                            onClick = { selectedStatus = if (selectedStatus == status) null else status },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = when (status) {
+                                    com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
+                                    com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+                                    com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                },
+                                unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        // Status indicator
+                        Surface(
+                            color = when (status) {
+                                com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
+                                com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+                                com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                            },
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.size(20.dp)
+                        ) {}
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Text(
+                            text = status.name.replace("_", " "),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = if (selectedStatus == status) FontWeight.SemiBold else FontWeight.Normal
+                            ),
+                            color = if (selectedStatus == status) {
+                                when (status) {
+                                    com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
+                                    com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+                                    com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                }
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -925,7 +1047,7 @@ fun FilterDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onApplyFilters(selectedCategory, selectedPriority) },
+                onClick = { onApplyFilters(selectedCategory, selectedStatus, selectedPriority) },
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
                 )
@@ -938,8 +1060,9 @@ fun FilterDialog(
                 TextButton(
                     onClick = { 
                         selectedCategory = null
+                        selectedStatus = null
                         selectedPriority = null
-                        onApplyFilters(null, null)
+                        onApplyFilters(null, null, null)
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

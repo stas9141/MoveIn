@@ -188,6 +188,11 @@ fun MoveInApp() {
                             coroutineScope.launch {
                                 if (result.isSuccess) {
                                     appState.navigateTo(Screen.Dashboard)
+                                } else {
+                                    // Show error message to user
+                                    val errorMessage = result.exceptionOrNull()?.message ?: "Google Sign-In failed"
+                                    println("Google Sign-In Error: $errorMessage")
+                                    // TODO: Show error dialog to user
                                 }
                             }
                         }
@@ -219,6 +224,11 @@ fun MoveInApp() {
                             coroutineScope.launch {
                                 if (result.isSuccess) {
                                     appState.navigateTo(Screen.Dashboard)
+                                } else {
+                                    // Show error message to user
+                                    val errorMessage = result.exceptionOrNull()?.message ?: "Google Sign-In failed"
+                                    println("Google Sign-In Error: $errorMessage")
+                                    // TODO: Show error dialog to user
                                 }
                             }
                         }
@@ -234,6 +244,9 @@ fun MoveInApp() {
                     onContinueClick = { userData ->
                         appState.initializeUserData(userData)
                         appState.navigateTo(Screen.Dashboard)
+                    },
+                    onBackClick = {
+                        appState.navigateTo(Screen.Welcome)
                     },
                     modifier = Modifier.padding(innerPadding)
                 )
@@ -255,17 +268,11 @@ fun MoveInApp() {
                             appState.addTask(newTask)
                             showAddTaskDialog = false
                         },
-                        showAddTaskDialog = showAddTaskDialog,
-                        onDismissAddTaskDialog = { showAddTaskDialog = false },
-                        onSettingsClick = {
-                            appState.navigateTo(Screen.Settings)
-                        },
                         onDefectListClick = {
                             appState.navigateTo(Screen.DefectList)
                         },
-                        onCalendarClick = {
-                            appState.navigateTo(Screen.Calendar)
-                        },
+                        showAddTaskDialog = showAddTaskDialog,
+                        onDismissAddTaskDialog = { showAddTaskDialog = false },
                         onTutorialClick = {
                             tutorialState.showTutorial(
                                 "Dashboard Overview", 

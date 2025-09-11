@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +39,7 @@ import com.example.movein.utils.formatCategory
 import com.example.movein.utils.formatPriority
 import java.util.UUID
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DefectListScreen(
     defects: List<Defect>,
@@ -63,6 +67,10 @@ fun DefectListScreen(
         
         matchesSearch && matchesCategory && matchesStatus && matchesPriority
     }
+    
+    // Separate active and completed defects
+    val activeDefects = filteredDefects.filter { it.status != DefectStatus.CLOSED }
+    val completedDefects = filteredDefects.filter { it.status == DefectStatus.CLOSED }
     
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -125,10 +133,21 @@ fun DefectListScreen(
                         )
                         
                         Box {
-                            IconButton(
-                                onClick = { showFilterDialog = true }
+                            val tooltipState = rememberTooltipState()
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text("Filter defects by category, status, and priority")
+                                    }
+                                },
+                                state = tooltipState
                             ) {
-                                Icon(Icons.Default.Settings, contentDescription = "Filter")
+                                IconButton(
+                                    onClick = { showFilterDialog = true }
+                                ) {
+                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Filter")
+                                }
                             }
                             
                             // Show indicator if filters are active
@@ -169,7 +188,7 @@ fun DefectListScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Settings,
+                                imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Active Filters",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
@@ -227,7 +246,81 @@ fun DefectListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (filteredDefects.isEmpty()) {
+                // Active Defects Section
+                if (activeDefects.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Active Defects (${activeDefects.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                    
+                    items(activeDefects) { defect ->
+                        DefectCard(
+                            defect = defect,
+                            onClick = { onDefectClick(defect) },
+                            onDefectUpdate = onDefectUpdate
+                        )
+                    }
+                }
+                
+                // Completed Defects Section
+                if (completedDefects.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Completed",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Completed Defects (${completedDefects.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                completedDefects.forEach { defect ->
+                                    CompletedDefectItem(
+                                        defect = defect,
+                                        onClick = { onDefectClick(defect) }
+                                    )
+                                    
+                                    if (defect != completedDefects.last()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Empty State
+                if (activeDefects.isEmpty() && completedDefects.isEmpty()) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth()
@@ -256,14 +349,6 @@ fun DefectListScreen(
                                 )
                             }
                         }
-                    }
-                } else {
-                    items(filteredDefects) { defect ->
-                        DefectCard(
-                            defect = defect,
-                            onClick = { onDefectClick(defect) },
-                            onDefectUpdate = onDefectUpdate
-                        )
                     }
                 }
             }
@@ -939,6 +1024,67 @@ fun DefectFilterDialog(
             }
         }
     )
+}
+
+@Composable
+fun CompletedDefectItem(
+    defect: Defect,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Completed",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = defect.location,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = defect.category.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                
+                if (defect.dueDate != null) {
+                    Text(
+                        text = "• Due: ${defect.dueDate}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                
+                if (defect.closedAt != null) {
+                    Text(
+                        text = "• Closed: ${defect.closedAt}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
 }
 
 
