@@ -1,8 +1,11 @@
 package com.example.movein.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Search
@@ -53,21 +57,21 @@ fun DashboardScreen(
 ) {
     var selectedTab by remember { mutableStateOf(selectedTabIndex) }
     var showFilterDialog by remember { mutableStateOf(false) }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
-    var selectedStatus by remember { mutableStateOf<com.example.movein.shared.data.TaskStatus?>(null) }
-    var selectedPriority by remember { mutableStateOf<Priority?>(null) }
+    var selectedCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedStatuses by remember { mutableStateOf<List<com.example.movein.shared.data.TaskStatus>>(emptyList()) }
+    var selectedPriorities by remember { mutableStateOf<List<Priority>>(emptyList()) }
     
     // Callback functions for state updates
     val clearFilters = {
-        selectedCategory = null
-        selectedStatus = null
-        selectedPriority = null
+        selectedCategories = emptyList()
+        selectedStatuses = emptyList()
+        selectedPriorities = emptyList()
     }
     
-    val applyFilters = { category: String?, status: com.example.movein.shared.data.TaskStatus?, priority: Priority? ->
-        selectedCategory = category
-        selectedStatus = status
-        selectedPriority = priority
+    val applyFilters = { categories: List<String>, statuses: List<com.example.movein.shared.data.TaskStatus>, priorities: List<Priority> ->
+        selectedCategories = categories
+        selectedStatuses = statuses
+        selectedPriorities = priorities
         showFilterDialog = false
     }
     
@@ -102,18 +106,49 @@ fun DashboardScreen(
     
     // Apply filters
     val filteredTasks = currentTasks.filter { task ->
-        (selectedCategory == null || task.category == selectedCategory) &&
-        (selectedStatus == null || task.status == selectedStatus) &&
-        (selectedPriority == null || task.priority == selectedPriority)
+        (selectedCategories.isEmpty() || selectedCategories.contains(task.category)) &&
+        (selectedStatuses.isEmpty() || selectedStatuses.contains(task.status)) &&
+        (selectedPriorities.isEmpty() || selectedPriorities.contains(task.priority))
     }
     
-    // Keep tasks in their original order (don't separate active/completed)
-    val activeTasks = filteredTasks.filter { !it.isCompleted }
-    val completedTasks = filteredTasks.filter { it.isCompleted }
+    // Get today's date for sorting
+    val today = java.time.LocalDate.now()
+    
+    // Sort tasks by status first, then priority, then due date
+    val sortedTasks = filteredTasks.sortedWith(compareBy<ChecklistItem> { task ->
+        // First priority: Status (Open → In Progress → Closed)
+        when (task.status) {
+            com.example.movein.shared.data.TaskStatus.OPEN -> 0
+            com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> 1
+            com.example.movein.shared.data.TaskStatus.CLOSED -> 2
+        }
+    }.thenBy { task ->
+        // Second priority: Priority within each status (High → Medium → Low)
+        when (task.priority) {
+            Priority.HIGH -> 0
+            Priority.MEDIUM -> 1
+            Priority.LOW -> 2
+        }
+    }.thenBy { task ->
+        // Third priority: Due date (overdue tasks first)
+        val dueDate = task.dueDate
+        if (dueDate != null) {
+            val parsedDate = parseDate(dueDate)
+            if (parsedDate != null && parsedDate.isBefore(today) && !task.isCompleted) {
+                -1 // Overdue tasks
+            } else {
+                0 // Normal tasks
+            }
+        } else {
+            1 // Tasks without due date
+        }
+    })
+    
+    val activeTasks = sortedTasks.filter { !it.isCompleted }
+    val completedTasks = sortedTasks.filter { it.isCompleted }
     val totalTasks = filteredTasks.size
     
     // Calculate additional summary statistics
-    val today = java.time.LocalDate.now()
     val overdueTasks = filteredTasks.count { task ->
         val dueDate = task.dueDate
         dueDate != null && !task.isCompleted && 
@@ -351,7 +386,7 @@ fun DashboardScreen(
                     }
                     
                     // Show indicator if filters are active
-                    if (selectedCategory != null || selectedPriority != null) {
+                    if (selectedCategories.isNotEmpty() || selectedStatuses.isNotEmpty() || selectedPriorities.isNotEmpty()) {
                         Surface(
                             color = MaterialTheme.colorScheme.error,
                             shape = CircleShape,
@@ -364,7 +399,7 @@ fun DashboardScreen(
             }
 
             // Filter Summary (only show if filters are active)
-            if (selectedCategory != null || selectedPriority != null) {
+            if (selectedCategories.isNotEmpty() || selectedStatuses.isNotEmpty() || selectedPriorities.isNotEmpty()) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -403,78 +438,13 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            selectedCategory?.let { category ->
-                                AssistChip(
-                                    onClick = { },
-                                    label = { Text(category) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.List,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                        labelColor = MaterialTheme.colorScheme.primary
-                                    )
-                                )
-                            }
-                            
-                            selectedStatus?.let { status ->
-                                AssistChip(
-                                    onClick = { },
-                                    label = { Text(status.name.replace("_", " ")) },
-                                    leadingIcon = {
-                                        Surface(
-                                            color = when (status) {
-                                                com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
-                                                com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
-                                                com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
-                                            },
-                                            shape = MaterialTheme.shapes.small,
-                                            modifier = Modifier.size(16.dp)
-                                        ) {}
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = when (status) {
-                                            com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                                            com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                                        },
-                                        labelColor = when (status) {
-                                            com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
-                                            com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
-                                            com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
-                                        }
-                                    )
-                                )
-                            }
-                            
-                            selectedPriority?.let { priority ->
-                                AssistChip(
-                                    onClick = { },
-                                    label = { Text(formatPriority(priority)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Star,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = when (priority) {
-                                            Priority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            Priority.MEDIUM -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                            Priority.HIGH -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                                        },
-                                        labelColor = when (priority) {
-                                            Priority.HIGH -> MaterialTheme.colorScheme.error
-                                            else -> MaterialTheme.colorScheme.primary
-                                        }
-                                    )
-                                )
-                            }
+                            // Show count of selected filters
+                            Text(
+                                text = "Filters: ${selectedCategories.size + selectedStatuses.size + selectedPriorities.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
                             
                             // Clear Filters Button
                             TextButton(
@@ -685,9 +655,9 @@ fun DashboardScreen(
             FilterDialog(
                 onDismiss = dismissFilterDialog,
                 onApplyFilters = applyFilters,
-                currentCategory = selectedCategory,
-                currentStatus = selectedStatus,
-                currentPriority = selectedPriority
+                currentCategories = selectedCategories,
+                currentStatuses = selectedStatuses,
+                currentPriorities = selectedPriorities
             )
         }
         
@@ -822,41 +792,30 @@ fun ChecklistItemCard(
 @Composable
 fun FilterDialog(
     onDismiss: () -> Unit,
-    onApplyFilters: (String?, com.example.movein.shared.data.TaskStatus?, Priority?) -> Unit,
-    currentCategory: String?,
-    currentStatus: com.example.movein.shared.data.TaskStatus?,
-    currentPriority: Priority?
+    onApplyFilters: (List<String>, List<com.example.movein.shared.data.TaskStatus>, List<Priority>) -> Unit,
+    currentCategories: List<String>,
+    currentStatuses: List<com.example.movein.shared.data.TaskStatus>,
+    currentPriorities: List<Priority>
 ) {
-    var selectedCategory by remember { mutableStateOf(currentCategory) }
-    var selectedStatus by remember { mutableStateOf(currentStatus) }
-    var selectedPriority by remember { mutableStateOf(currentPriority) }
+    var selectedCategories by remember { mutableStateOf(currentCategories) }
+    var selectedStatuses by remember { mutableStateOf(currentStatuses) }
+    var selectedPriorities by remember { mutableStateOf(currentPriorities) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Filter Tasks") },
         text = {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Category",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    if (selectedCategory != null) {
-                        TextButton(
-                            onClick = { selectedCategory = null },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Clear", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Category filter
+                Text(
+                    text = "Category",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 
                 val categories = listOf("Security", "Safety", "Utilities", "Cleaning", "Maintenance", "Comfort", "Administrative", "Services", "Community", "Technology", "Organization", "Parking", "Custom")
                 
@@ -864,16 +823,45 @@ fun FilterDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 8.dp)
+                            .clickable { 
+                                selectedCategories = if (selectedCategories.contains(category)) {
+                                    selectedCategories.filter { it != category }
+                                } else {
+                                    selectedCategories + category
+                                }
+                            },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = if (selectedCategory == category) null else category }
+                        Checkbox(
+                            checked = selectedCategories.contains(category),
+                            onCheckedChange = { isChecked ->
+                                selectedCategories = if (isChecked) {
+                                    selectedCategories + category
+                                } else {
+                                    selectedCategories.filter { it != category }
+                                }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier.size(20.dp)
                         )
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
                         Text(
                             text = category,
-                            modifier = Modifier.padding(start = 8.dp)
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = if (selectedCategories.contains(category)) FontWeight.SemiBold else FontWeight.Normal
+                            ),
+                            color = if (selectedCategories.contains(category)) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -881,46 +869,42 @@ fun FilterDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Status filter
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Status",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    if (selectedStatus != null) {
-                        TextButton(
-                            onClick = { selectedStatus = null },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Clear", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Status",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 
                 com.example.movein.shared.data.TaskStatus.values().forEach { status ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp)
-                            .clickable { selectedStatus = if (selectedStatus == status) null else status },
+                            .clickable { 
+                                selectedStatuses = if (selectedStatuses.contains(status)) {
+                                    selectedStatuses.filter { it != status }
+                                } else {
+                                    selectedStatuses + status
+                                }
+                            },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(
-                            selected = selectedStatus == status,
-                            onClick = { selectedStatus = if (selectedStatus == status) null else status },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = when (status) {
+                        Checkbox(
+                            checked = selectedStatuses.contains(status),
+                            onCheckedChange = { isChecked ->
+                                selectedStatuses = if (isChecked) {
+                                    selectedStatuses + status
+                                } else {
+                                    selectedStatuses.filter { it != status }
+                                }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = when (status) {
                                     com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
                                     com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
                                     com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
                                 },
-                                unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             ),
                             modifier = Modifier.size(20.dp)
                         )
@@ -930,22 +914,55 @@ fun FilterDialog(
                         // Status indicator
                         Surface(
                             color = when (status) {
-                                com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
-                                com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
-                                com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                                com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                                com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                com.example.movein.shared.data.TaskStatus.CLOSED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
                             },
                             shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.size(20.dp)
-                        ) {}
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                when (status) {
+                                    com.example.movein.shared.data.TaskStatus.OPEN -> {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                    com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> {
+                                        // Half-filled circle for In Progress - simplified version
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                                            shape = CircleShape,
+                                            modifier = Modifier.size(18.dp)
+                                        ) {}
+                                    }
+                                    com.example.movein.shared.data.TaskStatus.CLOSED -> {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
                         
                         Text(
                             text = status.name.replace("_", " "),
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = if (selectedStatus == status) FontWeight.SemiBold else FontWeight.Normal
+                                fontWeight = if (selectedStatuses.contains(status)) FontWeight.SemiBold else FontWeight.Normal
                             ),
-                            color = if (selectedStatus == status) {
+                            color = if (selectedStatuses.contains(status)) {
                                 when (status) {
                                     com.example.movein.shared.data.TaskStatus.OPEN -> MaterialTheme.colorScheme.error
                                     com.example.movein.shared.data.TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
@@ -961,93 +978,121 @@ fun FilterDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Priority",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    if (selectedPriority != null) {
-                        TextButton(
-                            onClick = { selectedPriority = null },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Clear", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+                // Priority filter
+                Text(
+                    text = "Priority",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 
                 Priority.values().forEach { priority ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 8.dp)
+                            .clickable { 
+                                selectedPriorities = if (selectedPriorities.contains(priority)) {
+                                    selectedPriorities.filter { it != priority }
+                                } else {
+                                    selectedPriorities + priority
+                                }
+                            },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(
-                            selected = selectedPriority == priority,
-                            onClick = { selectedPriority = if (selectedPriority == priority) null else priority },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = when (priority) {
+                        Checkbox(
+                            checked = selectedPriorities.contains(priority),
+                            onCheckedChange = { isChecked ->
+                                selectedPriorities = if (isChecked) {
+                                    selectedPriorities + priority
+                                } else {
+                                    selectedPriorities.filter { it != priority }
+                                }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = when (priority) {
                                     Priority.LOW -> MaterialTheme.colorScheme.primary
                                     Priority.MEDIUM -> MaterialTheme.colorScheme.secondary
                                     Priority.HIGH -> MaterialTheme.colorScheme.error
                                 },
-                                unselectedColor = when (priority) {
-                                    Priority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                    Priority.MEDIUM -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
-                                    Priority.HIGH -> MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                                }
-                            )
+                                uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier.size(20.dp)
                         )
                         
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         
                         // Priority indicator
                         Surface(
                             color = when (priority) {
-                                Priority.LOW -> MaterialTheme.colorScheme.primary
-                                Priority.MEDIUM -> MaterialTheme.colorScheme.secondary
-                                Priority.HIGH -> MaterialTheme.colorScheme.error
+                                Priority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                Priority.MEDIUM -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                                Priority.HIGH -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
                             },
                             shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.size(20.dp)
-                        ) {}
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        Text(
-                            text = formatPriority(priority),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = if (selectedPriority == priority) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = if (selectedPriority == priority) {
-                                when (priority) {
-                                    Priority.LOW -> MaterialTheme.colorScheme.primary
-                                    Priority.MEDIUM -> MaterialTheme.colorScheme.secondary
-                                    Priority.HIGH -> MaterialTheme.colorScheme.error
-                                }
-                            } else {
-                                when (priority) {
-                                    Priority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                    Priority.MEDIUM -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
-                                    Priority.HIGH -> MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                                }
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when (priority) {
+                                        Priority.LOW -> "L"
+                                        Priority.MEDIUM -> "M"
+                                        Priority.HIGH -> "H"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = when (priority) {
+                                        Priority.LOW -> MaterialTheme.colorScheme.primary
+                                        Priority.MEDIUM -> MaterialTheme.colorScheme.secondary
+                                        Priority.HIGH -> MaterialTheme.colorScheme.error
+                                    }
+                                )
                             }
-                        )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = formatPriority(priority),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (selectedPriorities.contains(priority)) FontWeight.SemiBold else FontWeight.Normal
+                                ),
+                                color = if (selectedPriorities.contains(priority)) {
+                                    when (priority) {
+                                        Priority.LOW -> MaterialTheme.colorScheme.primary
+                                        Priority.MEDIUM -> MaterialTheme.colorScheme.secondary
+                                        Priority.HIGH -> MaterialTheme.colorScheme.error
+                                    }
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            
+                            Spacer(modifier = Modifier.height(2.dp))
+                            
+                            Text(
+                                text = when (priority) {
+                                    Priority.LOW -> "Low urgency"
+                                    Priority.MEDIUM -> "Medium urgency"
+                                    Priority.HIGH -> "High urgency"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onApplyFilters(selectedCategory, selectedStatus, selectedPriority) },
+                onClick = { onApplyFilters(selectedCategories, selectedStatuses, selectedPriorities) },
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
                 )
@@ -1059,10 +1104,10 @@ fun FilterDialog(
             Row {
                 TextButton(
                     onClick = { 
-                        selectedCategory = null
-                        selectedStatus = null
-                        selectedPriority = null
-                        onApplyFilters(null, null, null)
+                        selectedCategories = emptyList()
+                        selectedStatuses = emptyList()
+                        selectedPriorities = emptyList()
+                        onApplyFilters(emptyList(), emptyList(), emptyList())
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

@@ -35,8 +35,10 @@ import com.example.movein.shared.data.Priority
 import com.example.movein.shared.data.SubTask
 import com.example.movein.utils.formatDateForDisplay
 import com.example.movein.ui.components.PriorityDropdown
+import com.example.movein.ui.components.DefectStatusDropdown
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.formatPriority
+import com.example.movein.utils.getTodayString
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,9 +70,44 @@ fun DefectListScreen(
         matchesSearch && matchesCategory && matchesStatus && matchesPriority
     }
     
+    // Sort defects by status first, then priority, then due date
+    val sortedDefects = filteredDefects.sortedWith(compareBy<Defect> { defect ->
+        // First priority: Status (Open → In Progress → Closed)
+        when (defect.status) {
+            DefectStatus.OPEN -> 0
+            DefectStatus.IN_PROGRESS -> 1
+            DefectStatus.CLOSED -> 2
+        }
+    }.thenBy { defect ->
+        // Second priority: Priority within each status (High → Medium → Low)
+        when (defect.priority) {
+            Priority.HIGH -> 0
+            Priority.MEDIUM -> 1
+            Priority.LOW -> 2
+        }
+    }.thenBy { defect ->
+        // Third priority: Due date (overdue defects first)
+        val dueDate = defect.dueDate
+        if (dueDate != null) {
+            try {
+                val parsedDate = java.time.LocalDate.parse(dueDate, java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy"))
+                val today = java.time.LocalDate.now()
+                if (parsedDate.isBefore(today) && defect.status != DefectStatus.CLOSED) {
+                    -1 // Overdue defects
+                } else {
+                    0 // Normal defects
+                }
+            } catch (e: Exception) {
+                1 // Invalid date format
+            }
+        } else {
+            1 // Defects without due date
+        }
+    })
+    
     // Separate active and completed defects
-    val activeDefects = filteredDefects.filter { it.status != DefectStatus.CLOSED }
-    val completedDefects = filteredDefects.filter { it.status == DefectStatus.CLOSED }
+    val activeDefects = sortedDefects.filter { it.status != DefectStatus.CLOSED }
+    val completedDefects = sortedDefects.filter { it.status == DefectStatus.CLOSED }
     
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -481,88 +518,28 @@ fun DefectCard(
                     }
                 }
                 
-                // Status text and icon in top right corner
+                // Status dropdown in top right corner
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 4.dp, end = 4.dp)
                 ) {
-                    Surface(
-                        color = when (defect.status) {
-                            DefectStatus.OPEN -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                            DefectStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                            DefectStatus.CLOSED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
-                        },
-                        border = when (defect.status) {
-                            DefectStatus.OPEN -> BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
-                            DefectStatus.IN_PROGRESS -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                            DefectStatus.CLOSED -> BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-                        },
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = when (defect.status) {
-                                    DefectStatus.OPEN -> "Open"
-                                    DefectStatus.IN_PROGRESS -> "In Progress"
-                                    DefectStatus.CLOSED -> "Closed"
-                                },
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = when (defect.status) {
-                                    DefectStatus.OPEN -> MaterialTheme.colorScheme.error
-                                    DefectStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
-                                    DefectStatus.CLOSED -> MaterialTheme.colorScheme.tertiary
+                    DefectStatusDropdown(
+                        currentStatus = defect.status,
+                        onStatusChange = { newStatus ->
+                            val updatedDefect = defect.copy(
+                                status = newStatus,
+                                closedAt = if (newStatus == DefectStatus.CLOSED && defect.closedAt == null) {
+                                    getTodayString()
+                                } else if (newStatus != DefectStatus.CLOSED) {
+                                    null
+                                } else {
+                                    defect.closedAt
                                 }
                             )
-                            
-                            Box(
-                                modifier = Modifier.size(12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                when (defect.status) {
-                                    DefectStatus.OPEN -> {
-                                        // Empty circle for Open status
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.surface,
-                                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
-                                            shape = CircleShape,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {}
-                                    }
-                                    DefectStatus.IN_PROGRESS -> {
-                                        // Half-filled circle for In Progress - simplified version
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-                                            shape = CircleShape,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {}
-                                    }
-                                    DefectStatus.CLOSED -> {
-                                        // Filled circle for Closed status
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            shape = CircleShape,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Closed",
-                                                tint = MaterialTheme.colorScheme.onTertiary,
-                                                modifier = Modifier.size(8.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            onDefectUpdate(updatedDefect)
                         }
-                    }
+                    )
                 }
             }
             

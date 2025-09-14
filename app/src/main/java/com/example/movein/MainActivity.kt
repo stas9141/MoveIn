@@ -1,12 +1,16 @@
 package com.example.movein
 
 import android.os.Bundle
+
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Scaffold
@@ -40,9 +44,12 @@ import com.example.movein.ui.theme.MoveInTheme
 import com.example.movein.ui.components.SimpleTutorialDialog
 import com.example.movein.ui.components.rememberSimpleTutorialState
 import com.example.movein.ui.components.BottomNavigationBar
+import com.example.movein.ui.components.OfflineIndicator
 import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
+import com.example.movein.offline.OfflineStorageManager
 import com.example.movein.auth.GoogleSignInHelper
+import com.example.movein.utils.ErrorHandler
 import com.google.firebase.FirebaseApp
 
 private fun shouldShowBottomNavigation(currentScreen: Screen): Boolean {
@@ -94,7 +101,18 @@ fun MoveInApp() {
         }
     }
     val appState = remember { 
-        val state = AppState(appStorage, cloudStorage, coroutineScope)
+        // Initialize offline storage
+        val offlineStorage = try {
+            if (appStorage != null && cloudStorage != null) {
+                OfflineStorageManager(context, cloudStorage, appStorage)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+        
+        val state = AppState(appStorage, cloudStorage, offlineStorage, coroutineScope)
         // Initialize cloud sync after AppState is created
         state.initializeCloudSync()
         state
@@ -105,6 +123,18 @@ fun MoveInApp() {
     
     // FAB state for Dashboard
     var showAddTaskDialog by remember { mutableStateOf(false) }
+    
+    // Google Sign-In error state
+    var googleSignInError by remember { mutableStateOf<String?>(null) }
+    
+    // Error clearing functions
+    val clearAuthError = {
+        appState.clearAuthError()
+    }
+    
+    val clearGoogleSignInError = {
+        googleSignInError = null
+    }
     
     // Get the activity for Google Sign-In
     val activity = context as? ComponentActivity
@@ -148,7 +178,16 @@ fun MoveInApp() {
                 }
             }
         ) { innerPadding ->
-        when (appState.currentScreen) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Offline indicator
+            OfflineIndicator(
+                syncStatus = appState.offlineSyncStatus,
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            // Main content with proper padding
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (appState.currentScreen) {
             Screen.Welcome -> {
                 WelcomeScreen(
                     onGetStartedClick = {
@@ -173,6 +212,9 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.Welcome)
                     },
                     onSignInClick = { email, password ->
+                        // Clear any existing errors before attempting sign in
+                        clearAuthError()
+                        clearGoogleSignInError()
                         coroutineScope.launch {
                             val result = appState.signIn(email, password)
                             if (result.isSuccess) {
@@ -184,21 +226,28 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.SignUp)
                     },
                     onGoogleSignInClick = {
+                        // Clear any existing errors before attempting Google sign in
+                        clearAuthError()
+                        clearGoogleSignInError()
                         googleSignInHelper?.signInWithGoogle { result ->
                             coroutineScope.launch {
                                 if (result.isSuccess) {
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
-                                    // Show error message to user
-                                    val errorMessage = result.exceptionOrNull()?.message ?: "Google Sign-In failed"
-                                    println("Google Sign-In Error: $errorMessage")
-                                    // TODO: Show error dialog to user
+                                    // Show user-friendly error message
+                                    val error = result.exceptionOrNull()
+                                    val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(error)
+                                    googleSignInError = userFriendlyError
+                                    println("Google Sign-In Error: ${error?.message}")
                                 }
                             }
                         }
                     },
                     isLoading = appState.authState.isLoading,
                     error = appState.authState.error,
+                    googleSignInError = googleSignInError,
+                    onDismissError = clearAuthError,
+                    onDismissGoogleError = clearGoogleSignInError,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -209,6 +258,9 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.Welcome)
                     },
                     onSignUpClick = { email, password ->
+                        // Clear any existing errors before attempting sign up
+                        clearAuthError()
+                        clearGoogleSignInError()
                         coroutineScope.launch {
                             val result = appState.signUp(email, password)
                             if (result.isSuccess) {
@@ -220,21 +272,28 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.Login)
                     },
                     onGoogleSignInClick = {
+                        // Clear any existing errors before attempting Google sign in
+                        clearAuthError()
+                        clearGoogleSignInError()
                         googleSignInHelper?.signInWithGoogle { result ->
                             coroutineScope.launch {
                                 if (result.isSuccess) {
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
-                                    // Show error message to user
-                                    val errorMessage = result.exceptionOrNull()?.message ?: "Google Sign-In failed"
-                                    println("Google Sign-In Error: $errorMessage")
-                                    // TODO: Show error dialog to user
+                                    // Show user-friendly error message
+                                    val error = result.exceptionOrNull()
+                                    val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(error)
+                                    googleSignInError = userFriendlyError
+                                    println("Google Sign-In Error: ${error?.message}")
                                 }
                             }
                         }
                     },
                     isLoading = appState.authState.isLoading,
                     error = appState.authState.error,
+                    googleSignInError = googleSignInError,
+                    onDismissError = clearAuthError,
+                    onDismissGoogleError = clearGoogleSignInError,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -436,6 +495,8 @@ fun MoveInApp() {
                     modifier = Modifier.padding(innerPadding)
                 )
             }
+        }
+        }
         }
         }
         

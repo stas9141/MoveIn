@@ -12,6 +12,8 @@ import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
 import com.example.movein.shared.cloud.AuthState
 import com.example.movein.shared.cloud.SyncStatus
+import com.example.movein.offline.OfflineStorageManager
+import com.example.movein.offline.SyncStatus as OfflineSyncStatus
 import com.example.movein.navigation.Screen
 import com.example.movein.utils.getTodayString
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 class AppState(
     private val appStorage: AppStorage?,
     private val cloudStorage: CloudStorage?,
+    private val offlineStorage: OfflineStorageManager?,
     private val coroutineScope: CoroutineScope
 ) {
     var currentScreen by mutableStateOf<Screen>(Screen.Welcome)
@@ -53,12 +56,25 @@ class AppState(
     var syncStatus by mutableStateOf(SyncStatus())
         private set
     
+    // Offline sync state
+    var offlineSyncStatus by mutableStateOf(OfflineSyncStatus())
+        private set
+    
     var isCloudSyncEnabled by mutableStateOf(false)
         private set
 
     init {
         // Load saved data when AppState is created
         loadSavedData()
+        
+        // Initialize offline sync if available
+        offlineStorage?.let { offline ->
+            coroutineScope.launch {
+                offline.syncStatus.collect { syncStatus ->
+                    this@AppState.offlineSyncStatus = syncStatus
+                }
+            }
+        }
     }
     
     fun initializeCloudSync() {
@@ -104,12 +120,28 @@ class AppState(
 
     private fun loadSavedData() {
         try {
-            // Load user data
-            val savedUserData = appStorage?.loadUserData()
+            // Load user data using offline storage if available, otherwise fallback to local storage
+            val savedUserData = if (offlineStorage != null) {
+                coroutineScope.launch {
+                    offlineStorage.loadUserData().getOrNull()
+                }
+                appStorage?.loadUserData() // Fallback to local storage for immediate loading
+            } else {
+                appStorage?.loadUserData()
+            }
+            
             if (savedUserData != null) {
                 userData = savedUserData
                 // Load checklist data
-                val savedChecklistData = appStorage?.loadChecklistData()
+                val savedChecklistData = if (offlineStorage != null) {
+                    coroutineScope.launch {
+                        offlineStorage.loadChecklistData().getOrNull()
+                    }
+                    appStorage?.loadChecklistData() // Fallback to local storage for immediate loading
+                } else {
+                    appStorage?.loadChecklistData()
+                }
+                
                 if (savedChecklistData != null) {
                     checklistData = savedChecklistData
                 } else {
@@ -153,16 +185,17 @@ class AppState(
         userData = data
         // Generate personalized checklist based on user data
         checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(data)
-        // Save to storage
-        appStorage?.saveUserData(data)
-        appStorage?.saveChecklistData(checklistData!!)
         
-        // Sync to cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
             coroutineScope.launch {
-                cloudStorage.saveUserData(data)
-                cloudStorage.saveChecklistData(checklistData!!)
+                offlineStorage.saveUserData(data)
+                offlineStorage.saveChecklistData(checklistData!!)
             }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveUserData(data)
+            appStorage?.saveChecklistData(checklistData!!)
         }
     }
 
@@ -204,14 +237,15 @@ class AppState(
         
         // Update the checklist data
         checklistData = updatedData
-        // Save to storage
-        appStorage?.saveChecklistData(checklistData!!)
         
-        // Sync to cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
             coroutineScope.launch {
-                cloudStorage.saveChecklistData(checklistData!!)
+                offlineStorage.saveChecklistData(checklistData!!)
             }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveChecklistData(checklistData!!)
         }
     }
 
@@ -229,13 +263,15 @@ class AppState(
     
     fun addDefect(defect: Defect) {
         defects = defects + defect
-        appStorage?.saveDefects(defects)
         
-        // Sync to cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
             coroutineScope.launch {
-                cloudStorage.saveDefects(defects)
+                offlineStorage.saveDefects(defects)
             }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveDefects(defects)
         }
     }
     
@@ -250,25 +286,29 @@ class AppState(
         }
         
         defects = defects.map { if (it.id == finalDefect.id) finalDefect else it }
-        appStorage?.saveDefects(defects)
         
-        // Sync to cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
             coroutineScope.launch {
-                cloudStorage.saveDefects(defects)
+                offlineStorage.saveDefects(defects)
             }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveDefects(defects)
         }
     }
     
     fun deleteDefect(defectId: String) {
         defects = defects.filter { it.id != defectId }
-        appStorage?.saveDefects(defects)
         
-        // Sync to cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
             coroutineScope.launch {
-                cloudStorage.saveDefects(defects)
+                offlineStorage.saveDefects(defects)
             }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveDefects(defects)
         }
     }
     
@@ -414,6 +454,10 @@ class AppState(
 
     suspend fun signOut(): Result<Unit> {
         return cloudStorage?.signOut() ?: Result.failure(Exception("Cloud storage not available"))
+    }
+    
+    fun clearAuthError() {
+        authState = authState.copy(error = null)
     }
     
     private suspend fun enableCloudSync() {

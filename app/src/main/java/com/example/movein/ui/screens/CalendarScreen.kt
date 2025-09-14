@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +54,8 @@ fun CalendarScreen(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var currentMonth by remember { mutableStateOf(LocalDate.now()) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
+    var showMultipleEventsDialog by remember { mutableStateOf(false) }
+    var multipleEventsDate by remember { mutableStateOf<LocalDate?>(null) }
     
     val dismissAddTaskDialog = {
         showAddTaskDialog = false
@@ -65,6 +68,16 @@ fun CalendarScreen(
     
     val openAddTaskDialog = {
         showAddTaskDialog = true
+    }
+    
+    val openMultipleEventsDialog = { date: LocalDate ->
+        multipleEventsDate = date
+        showMultipleEventsDialog = true
+    }
+    
+    val dismissMultipleEventsDialog = {
+        showMultipleEventsDialog = false
+        multipleEventsDate = null
     }
     
     val selectedDateTasks = remember(selectedDate, tasks) {
@@ -121,7 +134,8 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             tasks = tasks,
             defects = defects,
-            onDateClick = { date -> selectedDate = date }
+            onDateClick = { date -> selectedDate = date },
+            onMultipleEventsClick = openMultipleEventsDialog
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -145,6 +159,36 @@ fun CalendarScreen(
                 onDismiss = dismissAddTaskDialog,
                 onAddTask = addNewTask,
                 existingTaskNames = existingTaskNames
+            )
+        }
+        
+        // Multiple Events Dialog
+        if (showMultipleEventsDialog && multipleEventsDate != null) {
+            val eventsDate = multipleEventsDate!!
+            val eventsDateTasks = tasks.filter { task ->
+                task.dueDate?.let { dueDate ->
+                    parseDate(dueDate) == eventsDate
+                } ?: false
+            }
+            val eventsDateDefects = defects.filter { defect ->
+                defect.dueDate?.let { dueDate ->
+                    parseDate(dueDate) == eventsDate
+                } ?: false
+            }
+            
+            MultipleEventsDialog(
+                date = eventsDate,
+                tasks = eventsDateTasks,
+                defects = eventsDateDefects,
+                onDismiss = dismissMultipleEventsDialog,
+                onTaskClick = { task ->
+                    onTaskClick(task)
+                    dismissMultipleEventsDialog()
+                },
+                onDefectClick = { defect ->
+                    onDefectClick(defect)
+                    dismissMultipleEventsDialog()
+                }
             )
         }
     }
@@ -183,7 +227,8 @@ private fun CalendarGrid(
     selectedDate: LocalDate,
     tasks: List<ChecklistItem>,
     defects: List<Defect>,
-    onDateClick: (LocalDate) -> Unit
+    onDateClick: (LocalDate) -> Unit,
+    onMultipleEventsClick: (LocalDate) -> Unit = {}
 ) {
     val firstDayOfMonth = currentMonth.withDayOfMonth(1)
     val lastDayOfMonth = currentMonth.withDayOfMonth(currentMonth.lengthOfMonth())
@@ -241,13 +286,32 @@ private fun CalendarGrid(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 week.forEach { date ->
+                    val taskCount = tasks.count { task ->
+                        task.dueDate?.let { dueDate ->
+                            parseDate(dueDate) == date
+                        } ?: false
+                    }
+                    val defectCount = defects.count { defect ->
+                        defect.dueDate?.let { dueDate ->
+                            parseDate(dueDate) == date
+                        } ?: false
+                    }
+                    val totalEvents = taskCount + defectCount
+                    
                     CalendarDay(
                         date = date,
                         isSelected = date == selectedDate,
                         isCurrentMonth = date != LocalDate.MIN,
                         hasTasks = hasTasksOnDate(date, tasks),
                         hasDefects = hasDefectsOnDate(date, defects),
+                        taskCount = taskCount,
+                        defectCount = defectCount,
                         onClick = { if (date != LocalDate.MIN) onDateClick(date) },
+                        onMultipleEventsClick = { 
+                            if (date != LocalDate.MIN && totalEvents > 1) {
+                                onMultipleEventsClick(date)
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -264,7 +328,10 @@ private fun CalendarDay(
     isCurrentMonth: Boolean,
     hasTasks: Boolean,
     hasDefects: Boolean,
+    taskCount: Int = 0,
+    defectCount: Int = 0,
     onClick: () -> Unit,
+    onMultipleEventsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = when {
@@ -301,29 +368,53 @@ private fun CalendarDay(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
                 
-                // Indicators for tasks and defects
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    if (hasTasks) {
+                // Event indicators
+                val totalEvents = taskCount + defectCount
+                if (totalEvents > 0) {
+                    if (totalEvents == 1) {
+                        // Single event - show colored dot
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (hasTasks) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+                            if (hasDefects) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.error,
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+                        }
+                    } else {
+                        // Multiple events - show count badge
                         Box(
                             modifier = Modifier
-                                .size(4.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,
                                     shape = CircleShape
                                 )
-                        )
-                    }
-                    if (hasDefects) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.error,
-                                    shape = CircleShape
-                                )
-                        )
+                                .clickable { onMultipleEventsClick() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = totalEvents.toString(),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -639,4 +730,216 @@ private fun parseDate(dateString: String): LocalDate? {
 
 private fun formatDate(date: LocalDate): String {
     return "${date.monthValue}/${date.dayOfMonth}/${date.year}"
+}
+
+@Composable
+private fun MultipleEventsDialog(
+    date: LocalDate,
+    tasks: List<ChecklistItem>,
+    defects: List<Defect>,
+    onDismiss: () -> Unit,
+    onTaskClick: (ChecklistItem) -> Unit,
+    onDefectClick: (Defect) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Events on ${date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy"))}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val totalEvents = tasks.size + defects.size
+                Text(
+                    text = "Total: $totalEvents events",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Tasks section
+                    if (tasks.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Tasks (${tasks.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        
+                        items(tasks) { task ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onTaskClick(task) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Task",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = task.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = task.category,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    // Priority indicator
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = when (task.priority) {
+                                                Priority.LOW -> MaterialTheme.colorScheme.primaryContainer
+                                                Priority.MEDIUM -> MaterialTheme.colorScheme.secondaryContainer
+                                                Priority.HIGH -> MaterialTheme.colorScheme.errorContainer
+                                            }
+                                        ),
+                                        modifier = Modifier.padding(0.dp)
+                                    ) {
+                                        Text(
+                                            text = when (task.priority) {
+                                                Priority.LOW -> "Low"
+                                                Priority.MEDIUM -> "Med"
+                                                Priority.HIGH -> "High"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = when (task.priority) {
+                                                Priority.LOW -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                Priority.MEDIUM -> MaterialTheme.colorScheme.onSecondaryContainer
+                                                Priority.HIGH -> MaterialTheme.colorScheme.onErrorContainer
+                                            },
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (defects.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                    
+                    // Defects section
+                    if (defects.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Defects (${defects.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        
+                        items(defects) { defect ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onDefectClick(defect) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Defect",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = defect.location,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = defect.category.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    // Priority indicator
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = when (defect.priority) {
+                                                Priority.LOW -> MaterialTheme.colorScheme.primaryContainer
+                                                Priority.MEDIUM -> MaterialTheme.colorScheme.secondaryContainer
+                                                Priority.HIGH -> MaterialTheme.colorScheme.errorContainer
+                                            }
+                                        ),
+                                        modifier = Modifier.padding(0.dp)
+                                    ) {
+                                        Text(
+                                            text = when (defect.priority) {
+                                                Priority.LOW -> "Low"
+                                                Priority.MEDIUM -> "Med"
+                                                Priority.HIGH -> "High"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = when (defect.priority) {
+                                                Priority.LOW -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                Priority.MEDIUM -> MaterialTheme.colorScheme.onSecondaryContainer
+                                                Priority.HIGH -> MaterialTheme.colorScheme.onErrorContainer
+                                            },
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import com.example.movein.ui.components.ErrorDisplay
+import com.example.movein.utils.ErrorHandler
 
 @Composable
 fun SimpleSignUpScreen(
@@ -26,6 +28,9 @@ fun SimpleSignUpScreen(
     onGoogleSignInClick: () -> Unit,
     isLoading: Boolean = false,
     error: String? = null,
+    googleSignInError: String? = null,
+    onDismissError: (() -> Unit)? = null,
+    onDismissGoogleError: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("") }
@@ -83,21 +88,31 @@ fun SimpleSignUpScreen(
         
         Spacer(modifier = Modifier.height(48.dp))
         
-        // Error Message
+        // Error Messages
         error?.let { errorMessage ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage), isSignUp = true)
+            val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
+            
+            ErrorDisplay(
+                error = userFriendlyError,
+                errorType = errorType,
+                onDismiss = onDismissError,
+                showRecoverySuggestion = true
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        
+        // Google Sign-In Error Message
+        googleSignInError?.let { errorMessage ->
+            val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
+            val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
+            
+            ErrorDisplay(
+                error = userFriendlyError,
+                errorType = errorType,
+                onDismiss = onDismissGoogleError,
+                showRecoverySuggestion = true
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
         
@@ -169,6 +184,9 @@ fun SimpleSignUpScreen(
         // Sign Up Button
         Button(
             onClick = {
+                // Clear any existing errors when attempting to sign up
+                onDismissError?.invoke()
+                onDismissGoogleError?.invoke()
                 scope.launch {
                     onSignUpClick(email, password)
                 }
@@ -191,6 +209,9 @@ fun SimpleSignUpScreen(
         // Google Sign In Button
         OutlinedButton(
             onClick = {
+                // Clear any existing errors when attempting to sign in
+                onDismissError?.invoke()
+                onDismissGoogleError?.invoke()
                 scope.launch {
                     onGoogleSignInClick()
                 }

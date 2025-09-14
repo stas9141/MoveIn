@@ -1,7 +1,9 @@
 package com.example.movein.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -480,17 +482,17 @@ fun AddEditDefectScreen(
             }
         }
         
-        // Save Button
-        Button(
+        // Save Button - Gentle Style
+        OutlinedButton(
             onClick = {
                 // Validate inputs
                 if (location.trim().isEmpty()) {
                     locationError = "Location is required"
-                    return@Button
+                    return@OutlinedButton
                 }
                 if (description.trim().isEmpty()) {
                     descriptionError = "Description is required"
-                    return@Button
+                    return@OutlinedButton
                 }
                 
                 val newDefect = Defect(
@@ -512,18 +514,35 @@ fun AddEditDefectScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+                .height(48.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.primary,
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Text(
-                text = if (isEditing) "Update Defect" else "Save Defect",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Save",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = if (isEditing) "Update Defect" else "Save Defect",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                )
+            }
         }
         
         // Dialogs

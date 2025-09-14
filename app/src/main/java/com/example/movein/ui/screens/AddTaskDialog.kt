@@ -1,10 +1,13 @@
 package com.example.movein.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -200,17 +203,17 @@ fun AddTaskDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 onClick = {
                     // Validate task name
                     if (taskName.trim().isEmpty()) {
                         nameError = "Task name is required"
-                        return@Button
+                        return@OutlinedButton
                     }
                     
                     if (existingTaskNames.any { it.equals(taskName.trim(), ignoreCase = true) }) {
                         nameError = "Task name must be unique"
-                        return@Button
+                        return@OutlinedButton
                     }
                     
                     // Create new task
@@ -228,12 +231,34 @@ fun AddTaskDialog(
                     onDismiss()
                 },
                 enabled = taskName.trim().isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                ),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Add Task")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Add",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    )
+                    Text(
+                        text = "Add Task",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                    )
+                }
             }
         },
         dismissButton = {
