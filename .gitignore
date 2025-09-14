@@ -13,3 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase configuration (contains sensitive data)
+app/google-services.json
+iosApp/GoogleService-Info.plist
+
+# iOS specific
+iosApp/Pods/
+iosApp/*.xcworkspace
+iosApp/Podfile.lock

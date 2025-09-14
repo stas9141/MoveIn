@@ -1,6 +1,7 @@
 package com.example.movein
 
 import android.os.Bundle
+import android.util.Log
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
@@ -226,14 +228,18 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.SignUp)
                     },
                     onGoogleSignInClick = {
+                        Log.d("MainActivity", "Google Sign-In button clicked (Welcome)")
                         // Clear any existing errors before attempting Google sign in
                         clearAuthError()
                         clearGoogleSignInError()
                         googleSignInHelper?.signInWithGoogle { result ->
+                            Log.d("MainActivity", "Google Sign-In result: ${result.isSuccess}")
                             coroutineScope.launch {
                                 if (result.isSuccess) {
+                                    Log.d("MainActivity", "Navigating to Dashboard")
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
+                                    Log.e("MainActivity", "Google Sign-In failed: ${result.exceptionOrNull()?.message}")
                                     // Show user-friendly error message
                                     val error = result.exceptionOrNull()
                                     val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(error)
@@ -272,14 +278,18 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.Login)
                     },
                     onGoogleSignInClick = {
+                        Log.d("MainActivity", "Google Sign-In button clicked (Welcome)")
                         // Clear any existing errors before attempting Google sign in
                         clearAuthError()
                         clearGoogleSignInError()
                         googleSignInHelper?.signInWithGoogle { result ->
+                            Log.d("MainActivity", "Google Sign-In result: ${result.isSuccess}")
                             coroutineScope.launch {
                                 if (result.isSuccess) {
+                                    Log.d("MainActivity", "Navigating to Dashboard")
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
+                                    Log.e("MainActivity", "Google Sign-In failed: ${result.exceptionOrNull()?.message}")
                                     // Show user-friendly error message
                                     val error = result.exceptionOrNull()
                                     val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(error)
@@ -341,6 +351,11 @@ fun MoveInApp() {
                         defects = appState.defects,
                         modifier = Modifier.padding(innerPadding)
                     )
+                } ?: run {
+                    // Show loading or redirect to apartment details if no checklist data
+                    LaunchedEffect(Unit) {
+                        appState.navigateTo(Screen.ApartmentDetails)
+                    }
                 }
             }
             

@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "54162983506",
-    "project_id": "movein-b020b",
-    "storage_bucket": "movein-b020b.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "your-firebase-project-id",
+    "storage_bucket": "your-firebase-project-id.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:54162983506:android:386e09db238a841e346d8b",
+        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID",
         "android_client_info": {
           "package_name": "com.example.movein"
         }
       },
       "oauth_client": [
         {
-          "client_id": "54162983506-8fepnn8ic3dobeq07ml6v6u269muieup.apps.googleusercontent.com",
+          "client_id": "YOUR_PROJECT_NUMBER-YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.movein",
-            "certificate_hash": "573d3920eb702799a277d355432144c8bf997a84"
+            "certificate_hash": "YOUR_SHA1_FINGERPRINT"
           }
         },
         {
-          "client_id": "54162983506-0tmbl2ol88fo1d1p3r378862l402kp49.apps.googleusercontent.com",
+          "client_id": "YOUR_PROJECT_NUMBER-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCOUZUv4V-KmV6W0xrbk92cMOY0ZhRRQ_c"
+          "current_key": "YOUR_API_KEY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "54162983506-0tmbl2ol88fo1d1p3r378862l402kp49.apps.googleusercontent.com",
+              "client_id": "YOUR_PROJECT_NUMBER-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

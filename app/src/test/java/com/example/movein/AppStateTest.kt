@@ -6,12 +6,19 @@ import com.example.movein.shared.data.UserData
 import com.example.movein.shared.data.FileAttachment
 import com.example.movein.shared.data.SubTask
 import com.example.movein.navigation.Screen
-import com.example.movein.shared.storage.DefectStorage
+import com.example.movein.shared.storage.AppStorage
+import com.example.movein.shared.cloud.CloudStorage
+import com.example.movein.offline.OfflineStorageManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.Before
 import io.mockk.mockk
 import io.mockk.every
+import io.mockk.coEvery
+import kotlin.Result
 
 class AppStateTest {
 
@@ -19,10 +26,25 @@ class AppStateTest {
 
     @Before
     fun setUp() {
-        val mockDefectStorage = mockk<DefectStorage>()
-        every { mockDefectStorage.loadDefects() } returns emptyList()
-        every { mockDefectStorage.saveDefects(any()) } returns Unit
-        appState = AppState(mockDefectStorage)
+        val mockAppStorage = mockk<AppStorage>()
+        val mockCloudStorage = mockk<CloudStorage>()
+        val mockOfflineStorage = mockk<OfflineStorageManager>()
+        val coroutineScope = CoroutineScope(Dispatchers.Unconfined)
+        
+        every { mockAppStorage.loadDefects() } returns emptyList()
+        every { mockAppStorage.saveDefects(any()) } returns Unit
+        every { mockAppStorage.saveChecklistData(any()) } returns Unit
+        every { mockAppStorage.loadChecklistData() } returns null
+        every { mockAppStorage.loadUserData() } returns null
+        
+        coEvery { mockOfflineStorage.loadUserData() } returns Result.success(null)
+        coEvery { mockOfflineStorage.loadChecklistData() } returns Result.success(null)
+        coEvery { mockOfflineStorage.loadDefects() } returns Result.success(emptyList())
+        coEvery { mockOfflineStorage.saveUserData(any()) } returns Result.success(Unit)
+        coEvery { mockOfflineStorage.saveChecklistData(any()) } returns Result.success(Unit)
+        coEvery { mockOfflineStorage.saveDefects(any()) } returns Result.success(Unit)
+        
+        appState = AppState(mockAppStorage, mockCloudStorage, mockOfflineStorage, coroutineScope)
     }
 
     @Test
