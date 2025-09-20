@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.movein.shared.data.Defect
 import com.example.movein.shared.data.SubTask
@@ -47,6 +49,9 @@ fun DefectDetailScreen(
     modifier: Modifier = Modifier
 ) {
     var currentDefect by remember { mutableStateOf(defect) }
+    var originalDefect by remember { mutableStateOf(defect) }
+    var isEditing by remember { mutableStateOf(false) }
+    var hasChanges by remember { mutableStateOf(false) }
     var newSubTaskText by remember { mutableStateOf("") }
     var newNoteText by remember { mutableStateOf(defect.notes) }
     var showStatusDialog by remember { mutableStateOf(false) }
@@ -55,6 +60,30 @@ fun DefectDetailScreen(
     var showRemoveAllDialog by remember { mutableStateOf(false) }
     var editingSubTaskId by remember { mutableStateOf<String?>(null) }
     var editingSubTaskText by remember { mutableStateOf("") }
+    
+    // Save and cancel functions
+    val saveChanges = {
+        onDefectUpdate(currentDefect)
+        originalDefect = currentDefect
+        isEditing = false
+        hasChanges = false
+    }
+    
+    val cancelChanges = {
+        currentDefect = originalDefect
+        newNoteText = originalDefect.notes
+        isEditing = false
+        hasChanges = false
+    }
+    
+    val startEditing = {
+        isEditing = true
+    }
+    
+    // Track changes
+    LaunchedEffect(currentDefect, newNoteText) {
+        hasChanges = currentDefect != originalDefect || newNoteText != originalDefect.notes
+    }
     
     // Helper function to check if defect has open sub-tasks
     fun hasOpenSubTasks(defect: Defect): Boolean {
@@ -78,7 +107,6 @@ fun DefectDetailScreen(
                 }
             }
             currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
-            onDefectUpdate(currentDefect)
         }
         editingSubTaskId = null
         editingSubTaskText = ""
@@ -109,8 +137,15 @@ fun DefectDetailScreen(
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
+            
+            // Edit button
+            if (!isEditing) {
+                IconButton(onClick = startEditing) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Defect")
+                }
+            }
         }
         
         LazyColumn(
@@ -245,7 +280,6 @@ fun DefectDetailScreen(
                                 currentPriority = currentDefect.priority,
                                 onPriorityChange = { newPriority: Priority ->
                                     currentDefect = currentDefect.copy(priority = newPriority)
-                                    onDefectUpdate(currentDefect)
                                 }
                             )
                             
@@ -488,7 +522,6 @@ fun DefectDetailScreen(
                             onValueChange = { 
                                 newNoteText = it
                                 currentDefect = currentDefect.copy(notes = it)
-                                onDefectUpdate(currentDefect)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Add notes about this defect...") },
@@ -667,7 +700,6 @@ fun DefectDetailScreen(
                                             currentDefect = currentDefect.copy(
                                                 subTasks = currentDefect.subTasks + newSubTask
                                             )
-                                            onDefectUpdate(currentDefect)
                                             newSubTaskText = ""
                                             
                                             // Automatically start editing the newly created sub-task
@@ -689,7 +721,6 @@ fun DefectDetailScreen(
                                         currentDefect = currentDefect.copy(
                                             subTasks = currentDefect.subTasks + newSubTask
                                         )
-                                        onDefectUpdate(currentDefect)
                                         newSubTaskText = ""
                                         
                                         // Automatically start editing the newly created sub-task
@@ -722,7 +753,6 @@ fun DefectDetailScreen(
                                             }
                                         }
                                         currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
-                                        onDefectUpdate(currentDefect)
                                     }
                                 )
                                 
@@ -739,6 +769,7 @@ fun DefectDetailScreen(
                                         ),
                                         textStyle = MaterialTheme.typography.bodyMedium,
                                         keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Text,
                                             imeAction = ImeAction.Done
                                         ),
                                         keyboardActions = KeyboardActions(
@@ -784,7 +815,6 @@ fun DefectDetailScreen(
                                         onClick = {
                                             val updatedSubTasks = currentDefect.subTasks.filter { it.id != subTask.id }
                                             currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
-                                            onDefectUpdate(currentDefect)
                                         }
                                     ) {
                                         Icon(Icons.Default.Delete, contentDescription = "Delete sub-task")
@@ -926,7 +956,6 @@ fun DefectDetailScreen(
                                     // Only allow status change if not trying to close with open sub-tasks
                                     if (status != DefectStatus.CLOSED || !hasOpenSubTasks(currentDefect)) {
                                         currentDefect = currentDefect.copy(status = status)
-                                        onDefectUpdate(currentDefect)
                                         showStatusDialog = false
                                     }
                                 },
@@ -1045,7 +1074,6 @@ fun DefectDetailScreen(
             selectedDate = currentDefect.dueDate,
             onDateSelected = { date ->
                 currentDefect = currentDefect.copy(dueDate = date)
-                onDefectUpdate(currentDefect)
             },
             onDismiss = { showDueDateDialog = false },
             title = "Set Due Date"
@@ -1089,7 +1117,6 @@ fun DefectDetailScreen(
                     onClick = {
                         val updatedSubTasks = currentDefect.subTasks.map { it.copy(isCompleted = true) }
                         currentDefect = currentDefect.copy(subTasks = updatedSubTasks)
-                        onDefectUpdate(currentDefect)
                         showCompleteAllDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -1143,7 +1170,6 @@ fun DefectDetailScreen(
                 Button(
                     onClick = {
                         currentDefect = currentDefect.copy(subTasks = emptyList())
-                        onDefectUpdate(currentDefect)
                         showRemoveAllDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -1159,7 +1185,16 @@ fun DefectDetailScreen(
                 }
             }
         )
+        
+        // Save/Cancel buttons when editing
+        if (isEditing && hasChanges) {
+            com.example.movein.ui.screens.SaveCancelButtons(
+                onSave = saveChanges,
+                onCancel = cancelChanges
+            )
+        }
     }
 }
+
 
 

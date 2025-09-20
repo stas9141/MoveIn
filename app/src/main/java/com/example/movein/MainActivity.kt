@@ -2,6 +2,7 @@ package com.example.movein
 
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,6 +42,8 @@ import com.example.movein.ui.screens.DefectDetailScreen
 import com.example.movein.ui.screens.CalendarScreen
 import com.example.movein.ui.screens.SimpleLoginScreen
 import com.example.movein.ui.screens.SimpleSignUpScreen
+import com.example.movein.ui.screens.ForgotPasswordScreen
+import com.example.movein.ui.screens.ResetPasswordScreen
 import com.example.movein.ui.screens.ReportConfigurationScreen
 import com.example.movein.ui.theme.MoveInTheme
 import com.example.movein.ui.components.SimpleTutorialDialog
@@ -51,6 +54,8 @@ import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
 import com.example.movein.offline.OfflineStorageManager
 import com.example.movein.auth.GoogleSignInHelper
+import com.example.movein.auth.AuthManager
+import com.example.movein.auth.BiometricAuthManager
 import com.example.movein.utils.ErrorHandler
 import com.google.firebase.FirebaseApp
 
@@ -74,6 +79,9 @@ class MainActivity : ComponentActivity() {
         
         // Initialize Firebase
         FirebaseApp.initializeApp(this)
+        
+        // Configure keyboard behavior to adjust the layout when keyboard appears
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
         
         enableEdgeToEdge()
         setContent {
@@ -129,6 +137,20 @@ fun MoveInApp() {
     // Google Sign-In error state
     var googleSignInError by remember { mutableStateOf<String?>(null) }
     
+    // Biometric authentication state
+    var biometricError by remember { mutableStateOf<String?>(null) }
+    var isBiometricAvailable by remember { mutableStateOf(false) }
+    
+    // Password reset state
+    var passwordResetLoading by remember { mutableStateOf(false) }
+    var passwordResetError by remember { mutableStateOf<String?>(null) }
+    var passwordResetSuccess by remember { mutableStateOf<String?>(null) }
+    
+    // Reset password state
+    var resetPasswordLoading by remember { mutableStateOf(false) }
+    var resetPasswordError by remember { mutableStateOf<String?>(null) }
+    var resetPasswordSuccess by remember { mutableStateOf<String?>(null) }
+    
     // Error clearing functions
     val clearAuthError = {
         appState.clearAuthError()
@@ -136,6 +158,46 @@ fun MoveInApp() {
     
     val clearGoogleSignInError = {
         googleSignInError = null
+    }
+    
+    val clearBiometricError = {
+        biometricError = null
+    }
+    
+    val clearPasswordResetError = {
+        passwordResetError = null
+    }
+    
+    val clearPasswordResetSuccess = {
+        passwordResetSuccess = null
+    }
+    
+    val clearResetPasswordError = {
+        resetPasswordError = null
+    }
+    
+    val clearResetPasswordSuccess = {
+        resetPasswordSuccess = null
+    }
+    
+    // Check biometric availability when app starts
+    LaunchedEffect(Unit) {
+        try {
+            val biometricManager = BiometricAuthManager(context)
+            val authManager = AuthManager(context)
+            
+            // Check if biometric hardware is available
+            val hasHardware = biometricManager.hasBiometricHardware()
+            val hasEnrolled = biometricManager.hasEnrolledBiometrics()
+            val canUseBiometric = authManager.canUseBiometricAuth().getOrNull() ?: false
+            
+            isBiometricAvailable = hasHardware && hasEnrolled && canUseBiometric
+            
+            Log.d("MainActivity", "Biometric availability: hardware=$hasHardware, enrolled=$hasEnrolled, canUse=$canUseBiometric")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error checking biometric availability", e)
+            isBiometricAvailable = false
+        }
     }
     
     // Get the activity for Google Sign-In
@@ -187,9 +249,14 @@ fun MoveInApp() {
                 modifier = Modifier.fillMaxWidth()
             )
             
-            // Main content with proper padding
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (appState.currentScreen) {
+    // Handle Android back button
+    BackHandler(enabled = appState.canNavigateBack()) {
+        appState.navigateBack()
+    }
+    
+    // Main content with proper padding
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (appState.currentScreen) {
             Screen.Welcome -> {
                 WelcomeScreen(
                     onGetStartedClick = {
@@ -217,9 +284,18 @@ fun MoveInApp() {
                         // Clear any existing errors before attempting sign in
                         clearAuthError()
                         clearGoogleSignInError()
+                        clearBiometricError()
                         coroutineScope.launch {
                             val result = appState.signIn(email, password)
                             if (result.isSuccess) {
+                                // Enable biometric authentication after successful login
+                                try {
+                                    val authManager = AuthManager(context)
+                                    authManager.enableBiometricAuth()
+                                    Log.d("MainActivity", "Biometric authentication enabled after login")
+                                } catch (e: Exception) {
+                                    Log.e("MainActivity", "Failed to enable biometric authentication", e)
+                                }
                                 appState.navigateTo(Screen.Dashboard)
                             }
                         }
@@ -227,15 +303,27 @@ fun MoveInApp() {
                     onSignUpClick = {
                         appState.navigateTo(Screen.SignUp)
                     },
+                    onForgotPasswordClick = {
+                        appState.navigateTo(Screen.ForgotPassword)
+                    },
                     onGoogleSignInClick = {
                         Log.d("MainActivity", "Google Sign-In button clicked (Welcome)")
                         // Clear any existing errors before attempting Google sign in
                         clearAuthError()
                         clearGoogleSignInError()
+                        clearBiometricError()
                         googleSignInHelper?.signInWithGoogle { result ->
                             Log.d("MainActivity", "Google Sign-In result: ${result.isSuccess}")
                             coroutineScope.launch {
                                 if (result.isSuccess) {
+                                    // Enable biometric authentication after successful Google login
+                                    try {
+                                        val authManager = AuthManager(context)
+                                        authManager.enableBiometricAuth()
+                                        Log.d("MainActivity", "Biometric authentication enabled after Google login")
+                                    } catch (e: Exception) {
+                                        Log.e("MainActivity", "Failed to enable biometric authentication", e)
+                                    }
                                     Log.d("MainActivity", "Navigating to Dashboard")
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
@@ -249,11 +337,47 @@ fun MoveInApp() {
                             }
                         }
                     },
+                    onBiometricSignInClick = {
+                        // Clear any existing errors before attempting biometric sign in
+                        clearAuthError()
+                        clearGoogleSignInError()
+                        clearBiometricError()
+                        coroutineScope.launch {
+                            try {
+                                val biometricManager = BiometricAuthManager(context)
+                                val result = biometricManager.authenticateForLogin(activity as androidx.fragment.app.FragmentActivity)
+                                
+                                if (result.isSuccess) {
+                                    // Biometric authentication successful, check if we have stored credentials
+                                    val authManager = AuthManager(context)
+                                    val hasCredentials = authManager.canUseBiometricAuth().getOrNull() ?: false
+                                    
+                                    if (hasCredentials) {
+                                        // User is authenticated, navigate to dashboard
+                                        appState.navigateTo(Screen.Dashboard)
+                                        Log.d("MainActivity", "Biometric authentication successful")
+                                    } else {
+                                        biometricError = "No stored credentials found. Please sign in with your password first."
+                                    }
+                                } else {
+                                    val error = result.exceptionOrNull()
+                                    Log.e("MainActivity", "Biometric authentication failed: ${error?.message}")
+                                    biometricError = error?.message ?: "Biometric authentication failed"
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Biometric authentication error: ${e.message}")
+                                biometricError = e.message ?: "Biometric authentication failed"
+                            }
+                        }
+                    },
                     isLoading = appState.authState.isLoading,
                     error = appState.authState.error,
                     googleSignInError = googleSignInError,
+                    biometricError = biometricError,
                     onDismissError = clearAuthError,
                     onDismissGoogleError = clearGoogleSignInError,
+                    onDismissBiometricError = clearBiometricError,
+                    isBiometricAvailable = isBiometricAvailable,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -304,6 +428,92 @@ fun MoveInApp() {
                     googleSignInError = googleSignInError,
                     onDismissError = clearAuthError,
                     onDismissGoogleError = clearGoogleSignInError,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+            
+            Screen.ForgotPassword -> {
+                ForgotPasswordScreen(
+                    onBackClick = {
+                        // Clear password reset state when going back
+                        clearPasswordResetError()
+                        clearPasswordResetSuccess()
+                        appState.navigateTo(Screen.Login)
+                    },
+                    onSendResetEmail = { email ->
+                        coroutineScope.launch {
+                            try {
+                                // Clear previous states
+                                clearPasswordResetError()
+                                clearPasswordResetSuccess()
+                                passwordResetLoading = true
+                                
+                                val authManager = AuthManager(context)
+                                val result = authManager.forgotPassword(email)
+                                
+                                if (result.isSuccess) {
+                                    passwordResetSuccess = "We've sent a password reset link to $email. Please check your email and follow the instructions to reset your password."
+                                } else {
+                                    val error = result.exceptionOrNull()
+                                    passwordResetError = error?.message ?: "Failed to send reset email. Please try again."
+                                }
+                            } catch (e: Exception) {
+                                passwordResetError = "Error sending reset email: ${e.message}"
+                            } finally {
+                                passwordResetLoading = false
+                            }
+                        }
+                    },
+                    isLoading = passwordResetLoading,
+                    error = passwordResetError,
+                    successMessage = passwordResetSuccess,
+                    onDismissError = clearPasswordResetError,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+            
+            is Screen.ResetPassword -> {
+                // Extract token from route
+                val token = appState.currentScreen.route.split("/").lastOrNull() ?: ""
+                ResetPasswordScreen(
+                    resetToken = token,
+                    onBackClick = {
+                        // Clear reset password state when going back
+                        clearResetPasswordError()
+                        clearResetPasswordSuccess()
+                        appState.navigateTo(Screen.Login)
+                    },
+                    onResetPassword = { resetToken, newPassword ->
+                        coroutineScope.launch {
+                            try {
+                                // Clear previous states
+                                clearResetPasswordError()
+                                clearResetPasswordSuccess()
+                                resetPasswordLoading = true
+                                
+                                val authManager = AuthManager(context)
+                                val result = authManager.resetPassword(resetToken, newPassword)
+                                
+                                if (result.isSuccess) {
+                                    resetPasswordSuccess = "Your password has been reset successfully. You can now log in with your new password."
+                                    // Navigate to login after a short delay to show success message
+                                    kotlinx.coroutines.delay(2000)
+                                    appState.navigateTo(Screen.Login)
+                                } else {
+                                    val error = result.exceptionOrNull()
+                                    resetPasswordError = error?.message ?: "Failed to reset password. Please try again."
+                                }
+                            } catch (e: Exception) {
+                                resetPasswordError = "Error resetting password: ${e.message}"
+                            } finally {
+                                resetPasswordLoading = false
+                            }
+                        }
+                    },
+                    isLoading = resetPasswordLoading,
+                    error = resetPasswordError,
+                    successMessage = resetPasswordSuccess,
+                    onDismissError = clearResetPasswordError,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -387,7 +597,9 @@ fun MoveInApp() {
                         appState.reorganizeTasksByDueDate()
                     },
                     onClearData = {
-                        appState.clearAllData()
+                        coroutineScope.launch {
+                            appState.clearAllData()
+                        }
                     },
                     onGenerateReport = {
                         appState.navigateTo(Screen.ReportConfiguration)
@@ -408,6 +620,26 @@ fun MoveInApp() {
                     onSignOut = {
                         coroutineScope.launch {
                             appState.signOut()
+                        }
+                    },
+                    onLogoutAllDevices = {
+                        coroutineScope.launch {
+                            try {
+                                val authManager = AuthManager(context)
+                                val result = authManager.logoutAllDevices()
+                                if (result.isSuccess) {
+                                    // Show success message
+                                    println("Successfully logged out from all devices")
+                                    // Also sign out locally
+                                    appState.signOut()
+                                } else {
+                                    // Show error message
+                                    val error = result.exceptionOrNull()
+                                    println("Failed to logout from all devices: ${error?.message}")
+                                }
+                            } catch (e: Exception) {
+                                println("Error logging out from all devices: ${e.message}")
+                            }
                         }
                     },
                     modifier = Modifier.padding(innerPadding)
@@ -496,6 +728,66 @@ fun MoveInApp() {
                     onAddDefect = { newDefect ->
                         appState.selectDefect(newDefect)
                         appState.navigateTo(Screen.AddEditDefect)
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+            
+            Screen.Settings -> {
+                SettingsScreen(
+                    isDarkMode = appState.isDarkMode,
+                    onDarkModeToggle = { appState.toggleDarkMode() },
+                    onBackClick = {
+                        appState.navigateTo(Screen.Dashboard)
+                    },
+                    onReorganizeTasks = {
+                        appState.reorganizeTasksByDueDate()
+                    },
+                    onClearData = {
+                        coroutineScope.launch {
+                            appState.clearAllData()
+                        }
+                    },
+                    onGenerateReport = {
+                        appState.navigateTo(Screen.ReportConfiguration)
+                    },
+                    onTutorialClick = {
+                        tutorialState.showTutorial(
+                            "Settings",
+                            "Manage app preferences, data, and reports here. You can also sign out or clear all local data."
+                        )
+                    },
+                    authState = appState.authState,
+                    syncStatus = appState.cloudSyncStatus,
+                    onForceSync = {
+                        coroutineScope.launch {
+                            appState.forceSync()
+                        }
+                    },
+                    onSignOut = {
+                        coroutineScope.launch {
+                            appState.signOut()
+                        }
+                    },
+                    onLogoutAllDevices = {
+                        coroutineScope.launch {
+                            try {
+                                val authManager = AuthManager(context)
+                                val result = authManager.logoutAllDevices()
+                                if (result.isSuccess) {
+                                    // Show success message
+                                    println("Successfully logged out from all devices")
+                                    // Also sign out locally
+                                    appState.signOut()
+                                } else {
+                                    // Show error message
+                                    val error = result.exceptionOrNull()
+                                    println("Failed to logout from all devices: ${error?.message}")
+                                }
+                            } catch (e: Exception) {
+                                println("Error logging out from all devices: ${e.message}")
+                            }
+                        }
                     },
                     modifier = Modifier.padding(innerPadding)
                 )

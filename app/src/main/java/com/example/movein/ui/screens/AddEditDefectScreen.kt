@@ -4,9 +4,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -14,12 +19,16 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import kotlinx.coroutines.launch
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.movein.shared.data.Defect
 import com.example.movein.shared.data.DefectCategory
@@ -65,10 +74,14 @@ fun AddEditDefectScreen(
     var descriptionError by remember { mutableStateOf<String?>(null) }
 
     var selectedImages by remember { mutableStateOf(defect?.images ?: emptyList<String>()) }
+    var isSaving by remember { mutableStateOf(false) }
     
     val isEditing = defect != null
     
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
     
     // Permission state
     val hasPermission = rememberPermissionState(
@@ -175,35 +188,170 @@ fun AddEditDefectScreen(
         options.distinct().filter { it.isNotBlank() }
     }
     
-        Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // Custom top bar
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = {
+                // Custom top bar
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                        
+                        Text(
+                            text = if (isEditing) "Edit Defect" else "Add New Defect",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-                
-                Text(
-                    text = if (isEditing) "Edit Defect" else "Add New Defect",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            },
+            bottomBar = {
+                // Bottom buttons
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Cancel Button
+                        OutlinedButton(
+                            onClick = {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                                onBack()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                        
+                        // Save Button
+                        Button(
+                            onClick = {
+                                // Hide keyboard first
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                                
+                                // Validate inputs
+                                if (location.trim().isEmpty()) {
+                                    locationError = "Location is required"
+                                    return@Button
+                                }
+                                if (description.trim().isEmpty()) {
+                                    descriptionError = "Description is required"
+                                    return@Button
+                                }
+                                
+                                // Show loading state
+                                isSaving = true
+                                
+                                val newDefect = Defect(
+                                    id = defect?.id ?: UUID.randomUUID().toString(),
+                                    location = location.trim(),
+                                    category = selectedCategory,
+                                    priority = selectedPriority,
+                                    description = description.trim(),
+                                    images = selectedImages,
+                                    status = defect?.status ?: DefectStatus.OPEN,
+                                    createdAt = defect?.createdAt ?: getTodayString(),
+                                    dueDate = selectedDueDate,
+                                    subTasks = defect?.subTasks ?: emptyList(),
+                                    notes = defect?.notes ?: "",
+                                    assignedTo = defect?.assignedTo
+                                )
+                                
+                                onSave(newDefect)
+                                
+                                // Reset loading state after a short delay
+                                // Note: In a real app, you'd handle this in the parent component
+                                // For now, we'll just reset it immediately after the save
+                                isSaving = false
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSaving
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (isSaving) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (isEditing) Icons.Default.Edit else Icons.Default.Check,
+                                        contentDescription = if (isEditing) "Update" else "Save",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                                
+                                Text(
+                                    text = when {
+                                        isSaving && isEditing -> "Updating..."
+                                        isSaving -> "Saving..."
+                                        isEditing -> "Update"
+                                        else -> "Save"
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .clickable { 
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    }
+            ) {
         
         // Scrollable content
         Column(
@@ -353,7 +501,11 @@ fun AddEditDefectScreen(
                         if (descriptionError != null) {
                             Text(descriptionError!!, color = MaterialTheme.colorScheme.error)
                         }
-                    }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    )
                 )
             }
             
@@ -482,68 +634,6 @@ fun AddEditDefectScreen(
             }
         }
         
-        // Save Button - Gentle Style
-        OutlinedButton(
-            onClick = {
-                // Validate inputs
-                if (location.trim().isEmpty()) {
-                    locationError = "Location is required"
-                    return@OutlinedButton
-                }
-                if (description.trim().isEmpty()) {
-                    descriptionError = "Description is required"
-                    return@OutlinedButton
-                }
-                
-                val newDefect = Defect(
-                    id = defect?.id ?: UUID.randomUUID().toString(),
-                    location = location.trim(),
-                    category = selectedCategory,
-                    priority = selectedPriority,
-                    description = description.trim(),
-                    images = selectedImages,
-                    status = defect?.status ?: DefectStatus.OPEN,
-                    createdAt = defect?.createdAt ?: getTodayString(),
-                    dueDate = selectedDueDate,
-                    subTasks = defect?.subTasks ?: emptyList(),
-                    notes = defect?.notes ?: "",
-                    assignedTo = defect?.assignedTo
-                )
-                
-                onSave(newDefect)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary,
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Save",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                )
-                Text(
-                    text = if (isEditing) "Update Defect" else "Save Defect",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                )
-            }
-        }
         
         // Dialogs
         if (showCategoryDialog) {
@@ -632,11 +722,8 @@ fun AddEditDefectScreen(
                 title = "Select Due Date"
             )
         }
-        
-
-        
-
+            }
+        }
     }
-}
 
 

@@ -8,6 +8,7 @@ import com.example.movein.shared.data.ChecklistItem
 import com.example.movein.shared.data.UserData
 import com.example.movein.shared.data.Defect
 import com.example.movein.shared.data.DefectStatus
+import com.example.movein.shared.data.ChecklistDataGenerator
 import com.example.movein.shared.storage.AppStorage
 import com.example.movein.shared.cloud.CloudStorage
 import com.example.movein.shared.cloud.AuthState
@@ -49,9 +50,19 @@ class AppState(
     var isDarkMode by mutableStateOf(false)
         private set
     
-    // Cloud sync state
+    // Authentication state
     var authState by mutableStateOf(AuthState(false))
         private set
+    
+    // Cloud sync status
+    val cloudSyncStatus: SyncStatus
+        get() = SyncStatus(
+            isSyncing = false,
+            lastSyncTime = null,
+            error = null,
+            isOnline = true
+        )
+    
     
     var syncStatus by mutableStateOf(SyncStatus())
         private set
@@ -418,34 +429,22 @@ class AppState(
         }
     }
     
-    fun clearAllData() {
-        userData = null
-        checklistData = null
-        defects = emptyList()
-        selectedTask = null
-        selectedDefect = null
-        // Clear from storage
-        appStorage?.saveUserData(UserData()) // Save default empty data
-        appStorage?.saveChecklistData(ChecklistData(emptyList(), emptyList(), emptyList()))
-        appStorage?.saveDefects(emptyList())
-        
-        // Clear from cloud if authenticated
-        if (authState.isAuthenticated && cloudStorage != null) {
-            coroutineScope.launch {
-                cloudStorage.saveUserData(UserData())
-                cloudStorage.saveChecklistData(ChecklistData(emptyList(), emptyList(), emptyList()))
-                cloudStorage.saveDefects(emptyList())
-            }
-        }
-    }
     
     // Cloud sync methods
     suspend fun signIn(email: String, password: String): Result<Unit> {
-        return cloudStorage?.signIn(email, password) ?: Result.failure(Exception("Cloud storage not available"))
+        return if (cloudStorage != null) {
+            cloudStorage.signIn(email, password)
+        } else {
+            Result.failure(Exception("Firebase Authentication is not available. Please check your internet connection and try again."))
+        }
     }
 
     suspend fun signUp(email: String, password: String): Result<Unit> {
-        return cloudStorage?.signUp(email, password) ?: Result.failure(Exception("Cloud storage not available"))
+        return if (cloudStorage != null) {
+            cloudStorage.signUp(email, password)
+        } else {
+            Result.failure(Exception("Firebase Authentication is not available. Please check your internet connection and try again."))
+        }
     }
 
     suspend fun signInWithGoogle(): Result<Unit> {
@@ -453,7 +452,18 @@ class AppState(
     }
 
     suspend fun signOut(): Result<Unit> {
-        return cloudStorage?.signOut() ?: Result.failure(Exception("Cloud storage not available"))
+        return try {
+            // Sign out from cloud storage
+            cloudStorage?.signOut()
+            
+            // Navigate to login screen
+            navigateTo(Screen.Login)
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            println("Error signing out: ${e.message}")
+            Result.failure(e)
+        }
     }
     
     fun clearAuthError() {
@@ -524,4 +534,45 @@ class AppState(
     suspend fun forceSync(): Result<Unit> {
         return cloudStorage?.forceSync() ?: Result.failure(Exception("Cloud storage not available"))
     }
+    
+    
+    /**
+     * Clear user data while preserving predefined tasks
+     */
+    suspend fun clearAllData() {
+        try {
+            // Clear user profile and apartment details
+            userData = null
+            
+            // Clear authentication tokens
+            cloudStorage?.signOut()
+            
+            // Clear all defects (these are user-created)
+            defects = emptyList()
+            
+            // Reset selected items
+            selectedTask = null
+            selectedDefect = null
+            
+            // Reset checklist data to remove user modifications but keep predefined tasks
+            // We'll reload the predefined tasks from the generator
+            checklistData = ChecklistDataGenerator.getDefaultChecklistData()
+            
+            // Save the reset checklist data
+            appStorage?.saveChecklistData(checklistData!!)
+            appStorage?.saveDefects(defects)
+            
+            // Clear user data from storage (selective clearing)
+            appStorage?.clearUserData()
+            appStorage?.saveUserData(UserData()) // Reset to default
+            
+            // Navigate to welcome screen
+            navigateTo(Screen.Welcome)
+            
+            println("User data cleared successfully, predefined tasks preserved")
+        } catch (e: Exception) {
+            println("Error clearing user data: ${e.message}")
+        }
+    }
+    
 }

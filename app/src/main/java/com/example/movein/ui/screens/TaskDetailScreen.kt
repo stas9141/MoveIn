@@ -32,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,6 +61,9 @@ fun TaskDetailScreen(
     modifier: Modifier = Modifier
 ) {
     var currentTask by remember { mutableStateOf(task) }
+    var originalTask by remember { mutableStateOf(task) }
+    var isEditing by remember { mutableStateOf(false) }
+    var hasChanges by remember { mutableStateOf(false) }
     var newSubTaskText by remember { mutableStateOf("") }
     var newNoteText by remember { mutableStateOf(task.notes) }
     var showPriorityDialog by remember { mutableStateOf(false) }
@@ -84,7 +88,6 @@ fun TaskDetailScreen(
                 }
             }
             currentTask = currentTask.copy(subTasks = updatedSubTasks)
-            onTaskUpdate(currentTask)
         }
         editingSubTaskId = null
         editingSubTaskText = ""
@@ -93,6 +96,30 @@ fun TaskDetailScreen(
     val cancelSubTaskEditing = {
         editingSubTaskId = null
         editingSubTaskText = ""
+    }
+    
+    // Save and cancel functions
+    val saveChanges = {
+        onTaskUpdate(currentTask)
+        originalTask = currentTask
+        isEditing = false
+        hasChanges = false
+    }
+    
+    val cancelChanges = {
+        currentTask = originalTask
+        newNoteText = originalTask.notes
+        isEditing = false
+        hasChanges = false
+    }
+    
+    val startEditing = {
+        isEditing = true
+    }
+    
+    // Track changes
+    LaunchedEffect(currentTask, newNoteText) {
+        hasChanges = currentTask != originalTask || newNoteText != originalTask.notes
     }
 
     Column(
@@ -114,8 +141,15 @@ fun TaskDetailScreen(
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
+            
+            // Edit button
+            if (!isEditing) {
+                IconButton(onClick = startEditing) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Task")
+                }
+            }
         }
         
         LazyColumn(
@@ -145,7 +179,6 @@ fun TaskDetailScreen(
                                     isCompleted = isChecked,
                                     status = if (isChecked) com.example.movein.shared.data.TaskStatus.CLOSED else com.example.movein.shared.data.TaskStatus.OPEN
                                 )
-                                onTaskUpdate(currentTask)
                             }
                         )
                         
@@ -266,7 +299,6 @@ fun TaskDetailScreen(
                                             status = status,
                                             isCompleted = status == com.example.movein.shared.data.TaskStatus.CLOSED
                                         )
-                                        onTaskUpdate(currentTask)
                                     }
                                 )
                             }
@@ -368,7 +400,6 @@ fun TaskDetailScreen(
                             onValueChange = { 
                                 newNoteText = it
                                 currentTask = currentTask.copy(notes = it)
-                                onTaskUpdate(currentTask)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -408,7 +439,6 @@ fun TaskDetailScreen(
                                     onDelete = {
                                         val updatedAttachments = currentTask.attachments.filter { it.id != attachment.id }
                                         currentTask = currentTask.copy(attachments = updatedAttachments)
-                                        onTaskUpdate(currentTask)
                                     }
                                 )
                             }
@@ -471,7 +501,6 @@ fun TaskDetailScreen(
                                         currentTask = currentTask.copy(
                                             subTasks = currentTask.subTasks + newSubTask
                                         )
-                                        onTaskUpdate(currentTask)
                                         newSubTaskText = ""
                                         
                                         // Auto-open the new sub-task for editing
@@ -497,7 +526,6 @@ fun TaskDetailScreen(
                             if (it.id == subTask.id) it.copy(isCompleted = isChecked) else it 
                         }
                         currentTask = currentTask.copy(subTasks = updatedSubTasks)
-                        onTaskUpdate(currentTask)
                     },
                     onEditClick = { startEditingSubTask(subTask.id, subTask.title) },
                     onTextChange = { editingSubTaskText = it },
@@ -525,7 +553,6 @@ fun TaskDetailScreen(
                                     selected = currentTask.priority == priority,
                                     onClick = {
                                         currentTask = currentTask.copy(priority = priority)
-                                        onTaskUpdate(currentTask)
                                         showPriorityDialog = false
                                     }
                                 )
@@ -551,7 +578,6 @@ fun TaskDetailScreen(
                 selectedDate = currentTask.dueDate,
                 onDateSelected = { date ->
                     currentTask = currentTask.copy(dueDate = date)
-                    onTaskUpdate(currentTask)
                 },
                 onDismiss = { showDueDateDialog = false },
                 title = "Set Due Date"
@@ -572,7 +598,6 @@ fun TaskDetailScreen(
                         size = 1024 * 1024 // 1MB
                     )
                     currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
-                    onTaskUpdate(currentTask)
                     showAttachmentDialog = false
                 },
                 onAddFile = {
@@ -585,9 +610,16 @@ fun TaskDetailScreen(
                         size = 2048 * 1024 // 2MB
                     )
                     currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
-                    onTaskUpdate(currentTask)
                     showAttachmentDialog = false
                 }
+            )
+        }
+        
+        // Save/Cancel buttons when editing
+        if (isEditing && hasChanges) {
+            SaveCancelButtons(
+                onSave = saveChanges,
+                onCancel = cancelChanges
             )
         }
     }
@@ -634,6 +666,84 @@ fun AttachmentItem(
             
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete")
+            }
+        }
+        
+        // Save/Cancel buttons when editing - needs proper scope
+    }
+}
+
+@Composable
+fun SaveCancelButtons(
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Cancel Button
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+            
+            // Save Button
+            Button(
+                onClick = onSave,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Save",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                    
+                    Text(
+                        text = "Save Changes",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
         }
     }
@@ -773,5 +883,7 @@ fun SubTaskItem(
                 }
             }
         }
+        
+        // Save/Cancel buttons when editing - added above
     }
 }
