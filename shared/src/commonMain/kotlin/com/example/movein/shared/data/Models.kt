@@ -6,6 +6,7 @@ data class UserData(
     val bathrooms: Int = 1,
     val parking: Int = 1,
     val warehouse: Boolean = false,
+    val garden: Boolean = false,
     val balconies: Int = 0
 )
 

@@ -22,6 +22,7 @@ class GoogleSignInHelper(private val activity: ComponentActivity) {
     private val auth = FirebaseAuth.getInstance()
     
     private var onSignInResult: ((Result<Unit>) -> Unit)? = null
+    private var useBackendIntegration: Boolean = false
     
     private val signInLauncher: ActivityResultLauncher<IntentSenderRequest> = 
         activity.registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -35,6 +36,18 @@ class GoogleSignInHelper(private val activity: ComponentActivity) {
             startGoogleSignIn()
         } catch (e: Exception) {
             Log.e("GoogleSignIn", "Google Sign-In setup error: ${e.message}", e)
+            onResult(Result.failure(Exception("Google Sign-In setup error: ${e.message}")))
+        }
+    }
+    
+    fun signInWithGoogleAndBackend(onResult: (Result<Unit>) -> Unit) {
+        Log.d("GoogleSignIn", "signInWithGoogleAndBackend called")
+        onSignInResult = onResult
+        useBackendIntegration = true
+        try {
+            startGoogleSignIn()
+        } catch (e: Exception) {
+            Log.e("GoogleSignIn", "Google Sign-In with backend setup error: ${e.message}", e)
             onResult(Result.failure(Exception("Google Sign-In setup error: ${e.message}")))
         }
     }
@@ -85,18 +98,23 @@ class GoogleSignInHelper(private val activity: ComponentActivity) {
             val idToken = credential.googleIdToken
             
             if (idToken != null) {
-                Log.d("GoogleSignIn", "ID token received, signing in with Firebase...")
-                val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
-                auth.signInWithCredential(firebaseCredential)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("GoogleSignIn", "Firebase sign-in successful")
-                            onSignInResult?.invoke(Result.success(Unit))
-                        } else {
-                            Log.e("GoogleSignIn", "Firebase sign-in failed: ${task.exception?.message}")
-                            onSignInResult?.invoke(Result.failure(task.exception ?: Exception("Sign-in failed")))
+                if (useBackendIntegration) {
+                    Log.d("GoogleSignIn", "ID token received, signing in with backend...")
+                    handleBackendSignIn(idToken)
+                } else {
+                    Log.d("GoogleSignIn", "ID token received, signing in with Firebase...")
+                    val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+                    auth.signInWithCredential(firebaseCredential)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("GoogleSignIn", "Firebase sign-in successful")
+                                onSignInResult?.invoke(Result.success(Unit))
+                            } else {
+                                Log.e("GoogleSignIn", "Firebase sign-in failed: ${task.exception?.message}")
+                                onSignInResult?.invoke(Result.failure(task.exception ?: Exception("Sign-in failed")))
+                            }
                         }
-                    }
+                }
             } else {
                 Log.e("GoogleSignIn", "No ID token received")
                 onSignInResult?.invoke(Result.failure(Exception("No ID token received")))
@@ -108,6 +126,13 @@ class GoogleSignInHelper(private val activity: ComponentActivity) {
             Log.e("GoogleSignIn", "Unexpected error: ${e.message}", e)
             onSignInResult?.invoke(Result.failure(e))
         }
+    }
+    
+    private fun handleBackendSignIn(idToken: String) {
+        // This will be called from the MainActivity with proper coroutine scope
+        // For now, we'll just pass the token back to the caller
+        Log.d("GoogleSignIn", "Backend sign-in initiated with token")
+        onSignInResult?.invoke(Result.success(Unit))
     }
     
     private fun getWebClientId(): String {

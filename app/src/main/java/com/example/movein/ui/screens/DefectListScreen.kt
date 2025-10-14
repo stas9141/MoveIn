@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
@@ -49,6 +50,7 @@ fun DefectListScreen(
     onAddDefect: () -> Unit,
     onBackClick: () -> Unit,
     onDefectUpdate: (Defect) -> Unit = {},
+    selectedDefectId: String? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -277,8 +279,44 @@ fun DefectListScreen(
                 }
             }
             
-            // Defects list
+            // Defects list with auto-scroll to selected
+            val listState = rememberLazyListState()
+
+            LaunchedEffect(selectedDefectId, sortedDefects) {
+                selectedDefectId?.let { id ->
+                    var targetIndex: Int? = null
+                    var position = 0
+
+                    if (activeDefects.isNotEmpty()) {
+                        // Header for active
+                        position += 1
+                        val idx = activeDefects.indexOfFirst { it.id == id }
+                        if (idx >= 0) {
+                            targetIndex = position + idx
+                        } else {
+                            position += activeDefects.size
+                        }
+                    }
+
+                    if (targetIndex == null && completedDefects.isNotEmpty()) {
+                        // Header for completed
+                        position += 1
+                        val idx = completedDefects.indexOfFirst { it.id == id }
+                        if (idx >= 0) {
+                            targetIndex = position + idx
+                        }
+                    }
+
+                    targetIndex?.let { index ->
+                        if (index >= 0) {
+                            listState.animateScrollToItem(index)
+                        }
+                    }
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)

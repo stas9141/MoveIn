@@ -1,0 +1,12 @@
+com.example.movein.shared.test.shared-core-1.2.0-0 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/1bc05a68a4ff30ecfba2d266c6332eea/transformed/core-1.2.0/res
+com.example.movein.shared.test.shared-browser-1.4.0-1 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/89c1cd05ad7c13a7c3857f6aac13246e/transformed/browser-1.4.0/res
+com.example.movein.shared.test.shared-coordinatorlayout-1.0.0-2 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/c1adec292b37b07cb61f381aec2264cb/transformed/coordinatorlayout-1.0.0/res
+com.example.movein.shared.test.shared-play-services-basement-18.1.0-3 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/cfe0dc0b7acc5157928aab1a2f613d7e/transformed/play-services-basement-18.1.0/res
+com.example.movein.shared.test.shared-firebase-common-20.4.2-4 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/d175f65124abd40a412cc0c2678e9af3/transformed/firebase-common-20.4.2/res
+com.example.movein.shared.test.shared-play-services-base-18.0.1-5 /Users/stas.dobromilskyi/.gradle/caches/8.13/transforms/eb18bb05751f27b5c751a686ca4ec199/transformed/play-services-base-18.0.1/res
+com.example.movein.shared.test.shared-androidTest-6 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/generated/res/resValues/androidTest/debug
+com.example.movein.shared.test.shared-updated_navigation_xml-7 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/generated/updated_navigation_xml/debugAndroidTest
+com.example.movein.shared.test.shared-mergeDebugAndroidTestResources-8 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/merged.dir
+com.example.movein.shared.test.shared-mergeDebugAndroidTestResources-9 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/stripped.dir
+com.example.movein.shared.test.shared-debugAndroidTest-10 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/intermediates/merged_res/debugAndroidTest/mergeDebugAndroidTestResources
+com.example.movein.shared.test.shared-debug-11 /Users/stas.dobromilskyi/AndroidStudioProjects/MoveIn/shared/build/intermediates/packaged_res/debug/packageDebugResources

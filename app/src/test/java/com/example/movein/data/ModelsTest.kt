@@ -15,6 +15,7 @@ class ModelsTest {
         assertEquals(1, userData.bathrooms)
         assertEquals(1, userData.parking)
         assertFalse(userData.warehouse)
+        assertFalse(userData.garden)
     }
 
     @Test
@@ -23,13 +24,15 @@ class ModelsTest {
             rooms = 4,
             bathrooms = 2,
             parking = 2,
-            warehouse = true
+            warehouse = true,
+            garden = true
         )
         
         assertEquals(4, userData.rooms)
         assertEquals(2, userData.bathrooms)
         assertEquals(2, userData.parking)
         assertTrue(userData.warehouse)
+        assertTrue(userData.garden)
     }
 
     @Test

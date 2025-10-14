@@ -24,6 +24,7 @@ actual class AppStorage(private val context: Context) {
             put("bathrooms", userData.bathrooms)
             put("parking", userData.parking)
             put("warehouse", userData.warehouse)
+            put("garden", userData.garden)
             put("balconies", userData.balconies)
             put("selectedRoomNames", JSONArray(userData.selectedRoomNames))
         }
@@ -44,6 +45,7 @@ actual class AppStorage(private val context: Context) {
                 bathrooms = json.getInt("bathrooms"),
                 parking = json.getInt("parking"),
                 warehouse = json.getBoolean("warehouse"),
+                garden = json.optBoolean("garden", false), // Use optBoolean with default for backward compatibility
                 balconies = json.getInt("balconies"),
                 selectedRoomNames = roomNames
             )
@@ -247,5 +249,17 @@ actual class AppStorage(private val context: Context) {
             images = images,
             subTasks = subTasks
         )
+    }
+    
+    actual fun clearAllData() {
+        prefs.edit().clear().apply()
+    }
+    
+    actual fun clearUserData() {
+        // Clear only user-specific data, keep predefined tasks
+        prefs.edit()
+            .remove("user_data")
+            .remove("defects")
+            .apply()
     }
 }

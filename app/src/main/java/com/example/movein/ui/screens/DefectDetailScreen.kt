@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,55 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.util.*
+
+@Composable
+fun DefectCategoryDropdown(
+    currentCategory: DefectCategory,
+    onCategoryChange: (DefectCategory) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Box {
+        OutlinedTextField(
+            value = formatCategory(currentCategory),
+            onValueChange = { },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true },
+            placeholder = { Text("Select category") },
+            readOnly = true,
+            trailingIcon = {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Select category"
+                    )
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+        )
+        
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DefectCategory.values().forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(formatCategory(category)) },
+                    onClick = {
+                        onCategoryChange(category)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun DefectDetailScreen(
@@ -192,10 +243,11 @@ fun DefectDetailScreen(
             }
             
             Text(
-                text = "Defect Details",
+                text = if (isEditing) "Edit Defect" else "Defect Details",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
+                color = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             
@@ -222,7 +274,7 @@ fun DefectDetailScreen(
         
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -231,8 +283,14 @@ fun DefectDetailScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = if (isEditing) 
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                        else 
+                            MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    border = if (isEditing) 
+                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    else null
                 ) {
                     Column(
                         modifier = Modifier
@@ -441,18 +499,27 @@ fun DefectDetailScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                text = formatCategory(currentDefect.category),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        if (isEditing) {
+                            DefectCategoryDropdown(
+                                currentCategory = currentDefect.category,
+                                onCategoryChange = { newCategory ->
+                                    currentDefect = currentDefect.copy(category = newCategory)
+                                }
                             )
+                        } else {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = formatCategory(currentDefect.category),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -946,127 +1013,166 @@ fun DefectDetailScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Images",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            
-                            // Add photo button (only show when editing)
-                            if (isEditing) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Text(
+                            text = "Images",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Add images button (only show when editing)
+                        if (isEditing) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Camera button
+                                OutlinedButton(
+                                    onClick = {
+                                        if (PermissionUtils.hasCameraPermission(context)) {
+                                            try {
+                                                val imageFile = ImageUtils.createImageFile(context)
+                                                val imageUri = ImageUtils.getImageUri(context, imageFile)
+                                                cameraLauncher.launch(imageUri)
+                                            } catch (e: Exception) {
+                                                // Handle error
+                                            }
+                                        } else {
+                                            permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(0.5f)
                                 ) {
-                                    // Camera button
-                                    OutlinedButton(
-                                        onClick = {
-                                            if (PermissionUtils.hasCameraPermission(context)) {
-                                                try {
-                                                    val imageFile = ImageUtils.createImageFile(context)
-                                                    val imageUri = ImageUtils.getImageUri(context, imageFile)
-                                                    cameraLauncher.launch(imageUri)
-                                                } catch (e: Exception) {
-                                                    // Handle error
-                                                }
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Camera",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Camera")
+                                }
+                                
+                                // Gallery button
+                                OutlinedButton(
+                                    onClick = {
+                                        if (PermissionUtils.hasStoragePermission(context)) {
+                                            galleryLauncher.launch("image/*")
+                                        } else {
+                                            val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
                                             } else {
-                                                permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                                                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
                                             }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                        contentPadding = PaddingValues(0.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Take Photo",
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    
-                                    // Gallery button
-                                    OutlinedButton(
-                                        onClick = {
-                                            if (PermissionUtils.hasStoragePermission(context)) {
-                                                galleryLauncher.launch("image/*")
-                                            } else {
-                                                val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                                    arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
-                                                } else {
-                                                    arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-                                                }
-                                                permissionLauncher.launch(permissions)
-                                            }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                        contentPadding = PaddingValues(0.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Star,
-                                            contentDescription = "Select from Gallery",
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
+                                            permissionLauncher.launch(permissions)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(0.5f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        contentDescription = "Gallery",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Gallery")
                                 }
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        if (currentDefect.images.isEmpty()) {
-                            Text(
-                                text = "No images attached",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        } else {
-                            Text(
-                                text = "${currentDefect.images.size} image(s) attached",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                        // Show images
+                        if (currentDefect.images.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${currentDefect.images.size} photo(s)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                
+                                if (isEditing && currentDefect.images.isNotEmpty()) {
+                                    TextButton(
+                                        onClick = { /* TODO: Show clear all dialog */ }
+                                    ) {
+                                        Text("Clear all")
+                                    }
+                                }
+                            }
                             
                             Spacer(modifier = Modifier.height(8.dp))
                             
-                            // Show image chips
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.horizontalScroll(rememberScrollState())
+                            // Show image thumbnails
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                currentDefect.images.forEach { imagePath ->
-                                    AssistChip(
-                                        onClick = { },
-                                        label = { 
-                                            Text(
-                                                text = imagePath.substringAfterLast("/").take(15) + if (imagePath.length > 15) "..." else "",
-                                                style = MaterialTheme.typography.bodySmall
-                                            )
-                                        },
-                                        trailingIcon = {
+                                items(currentDefect.images) { imagePath ->
+                                    Card(
+                                        modifier = Modifier.size(80.dp),
+                                        shape = MaterialTheme.shapes.medium
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            // Placeholder for image - in real implementation, load actual image
+                                            Surface(
+                                                modifier = Modifier.fillMaxSize(),
+                                                color = MaterialTheme.colorScheme.surfaceVariant
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Star,
+                                                        contentDescription = "Image",
+                                                        modifier = Modifier.size(32.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            
+                                            // Remove button (only in edit mode)
                                             if (isEditing) {
                                                 IconButton(
                                                     onClick = {
                                                         val newImages = currentDefect.images.filter { it != imagePath }
                                                         currentDefect = currentDefect.copy(images = newImages)
                                                     },
-                                                    modifier = Modifier.size(16.dp)
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(4.dp)
+                                                        .size(24.dp)
                                                 ) {
-                                                    Icon(
-                                                        Icons.Default.Close,
-                                                        contentDescription = "Remove",
-                                                        modifier = Modifier.size(12.dp)
-                                                    )
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        shape = CircleShape
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.Close,
+                                                            contentDescription = "Remove",
+                                                            modifier = Modifier
+                                                                .padding(4.dp)
+                                                                .size(16.dp),
+                                                            tint = MaterialTheme.colorScheme.onError
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
-                                    )
+                                    }
                                 }
                             }
+                        } else {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "No images attached",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         }
                     }
                 }
@@ -1396,7 +1502,7 @@ fun DefectDetailScreen(
         )
         
         // Save/Cancel buttons when editing
-        if (isEditing && hasChanges) {
+        if (isEditing) {
             SaveCancelButtons(
                 onSave = saveChanges,
                 onCancel = cancelChanges

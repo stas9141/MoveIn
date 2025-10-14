@@ -2,7 +2,7 @@ package com.example.movein.ui.screens
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
-import com.example.movein.data.UserData
+import com.example.movein.shared.data.UserData
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.*
@@ -22,7 +22,10 @@ class ApartmentDetailsScreenTest {
                 onContinueClick = { data ->
                     continueClicked = true
                     userData = data
-                }
+                },
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -40,7 +43,10 @@ class ApartmentDetailsScreenTest {
     fun apartmentDetailsScreen_shouldHaveDefaultValues() {
         composeTestRule.setContent {
             ApartmentDetailsScreen(
-                onContinueClick = {}
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -54,7 +60,10 @@ class ApartmentDetailsScreenTest {
     fun apartmentDetailsScreen_shouldAllowRoomSelection() {
         composeTestRule.setContent {
             ApartmentDetailsScreen(
-                onContinueClick = {}
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -70,7 +79,10 @@ class ApartmentDetailsScreenTest {
     fun apartmentDetailsScreen_shouldAllowBathroomSelection() {
         composeTestRule.setContent {
             ApartmentDetailsScreen(
-                onContinueClick = {}
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -86,7 +98,10 @@ class ApartmentDetailsScreenTest {
     fun apartmentDetailsScreen_shouldAllowParkingSelection() {
         composeTestRule.setContent {
             ApartmentDetailsScreen(
-                onContinueClick = {}
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -99,12 +114,30 @@ class ApartmentDetailsScreenTest {
     fun apartmentDetailsScreen_shouldAllowWarehouseToggle() {
         composeTestRule.setContent {
             ApartmentDetailsScreen(
-                onContinueClick = {}
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
         // Find and click the warehouse switch
         composeTestRule.onNodeWithText("Do you have a warehouse?").assertIsDisplayed()
+    }
+
+    @Test
+    fun apartmentDetailsScreen_shouldAllowGardenToggle() {
+        composeTestRule.setContent {
+            ApartmentDetailsScreen(
+                onContinueClick = {},
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
+            )
+        }
+
+        // Find and click the garden switch
+        composeTestRule.onNodeWithText("Do you have a garden?").assertIsDisplayed()
     }
 
     @Test
@@ -117,7 +150,10 @@ class ApartmentDetailsScreenTest {
                 onContinueClick = { data ->
                     continueClicked = true
                     userData = data
-                }
+                },
+                onBackClick = {},
+                onSignUpClick = {},
+                onSignInClick = {}
             )
         }
 
@@ -136,5 +172,6 @@ class ApartmentDetailsScreenTest {
         assertEquals(2, userData!!.bathrooms)
         assertEquals(2, userData!!.parking)
         assertFalse(userData!!.warehouse)
+        assertFalse(userData!!.garden)
     }
 }

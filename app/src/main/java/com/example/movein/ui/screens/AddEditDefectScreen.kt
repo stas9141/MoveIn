@@ -3,7 +3,7 @@ package com.example.movein.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+// RoundedCornerShape already imported above; removing duplicate import to avoid ambiguity
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,6 +12,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import kotlinx.coroutines.launch
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -50,12 +53,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.movein.ui.components.EnhancedDatePicker
+import com.example.movein.ui.components.ImageAttachButton
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditDefectScreen(
     defect: Defect? = null,
+    initialDueDate: String? = null,
     userData: UserData? = null,
     onSave: (Defect) -> Unit,
     onBack: () -> Unit,
@@ -65,7 +77,7 @@ fun AddEditDefectScreen(
     var selectedCategory by remember { mutableStateOf(defect?.category ?: DefectCategory.OTHER) }
     var selectedPriority by remember { mutableStateOf(defect?.priority ?: Priority.MEDIUM) }
     var description by remember { mutableStateOf(defect?.description ?: "") }
-    var selectedDueDate by remember { mutableStateOf(defect?.dueDate) }
+    var selectedDueDate by remember { mutableStateOf(defect?.dueDate ?: initialDueDate) }
     var showCategoryDialog by remember { mutableStateOf(false) }
     var showPriorityDialog by remember { mutableStateOf(false) }
     var showDueDateDialog by remember { mutableStateOf(false) }
@@ -83,33 +95,6 @@ fun AddEditDefectScreen(
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     
-    // Permission state
-    val hasPermission = rememberPermissionState(
-        onPermissionGranted = { },
-        onPermissionDenied = { }
-    )
-    
-    // Camera launcher
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            // Image captured successfully
-            val timestamp = System.currentTimeMillis()
-            selectedImages = selectedImages + "Camera_${timestamp}.jpg"
-        }
-    }
-    
-    // Gallery launcher
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            // Image selected successfully
-            val timestamp = System.currentTimeMillis()
-            selectedImages = selectedImages + "Gallery_${timestamp}.jpg"
-        }
-    }
     
     // Generate location options based on user data
     val locationOptions = remember(userData) {
@@ -376,6 +361,9 @@ fun AddEditDefectScreen(
                     onExpandedChange = { showLocationDialog = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                Box(modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLocationDialog = true }) {
                     OutlinedTextField(
                         value = location,
                         onValueChange = { },
@@ -388,8 +376,11 @@ fun AddEditDefectScreen(
                             }
                         },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showLocationDialog) },
-                        modifier = Modifier.menuAnchor()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
                     )
+                }
                     
                     ExposedDropdownMenu(
                         expanded = showLocationDialog,
@@ -422,7 +413,9 @@ fun AddEditDefectScreen(
                 OutlinedTextField(
                     value = formatCategory(selectedCategory),
                     onValueChange = { },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(Unit) { detectTapGestures(onTap = { showCategoryDialog = true }) },
                     readOnly = true,
                     trailingIcon = {
                         IconButton(onClick = { showCategoryDialog = true }) {
@@ -445,7 +438,9 @@ fun AddEditDefectScreen(
                 OutlinedTextField(
                     value = formatPriority(selectedPriority),
                     onValueChange = { },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(Unit) { detectTapGestures(onTap = { showPriorityDialog = true }) },
                     readOnly = true,
                     trailingIcon = {
                         IconButton(onClick = { showPriorityDialog = true }) {
@@ -468,7 +463,9 @@ fun AddEditDefectScreen(
                 OutlinedTextField(
                     value = formatDateForDisplay(selectedDueDate),
                     onValueChange = { },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(Unit) { detectTapGestures(onTap = { showDueDateDialog = true }) },
                     readOnly = true,
                     trailingIcon = {
                         IconButton(onClick = { showDueDateDialog = true }) {
@@ -546,87 +543,152 @@ fun AddEditDefectScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (PermissionUtils.hasCameraPermission(context)) {
-                                        try {
-                                            val imageFile = ImageUtils.createImageFile(context)
-                                            val imageUri = ImageUtils.getImageUri(context, imageFile)
-                                            cameraLauncher.launch(imageUri)
-                                        } catch (e: Exception) {
-                                            // Handle error
-                                        }
-                                    } else {
-                                        // Request camera permission
-                                        hasPermission.value = false
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Take Photo")
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Camera")
-                            }
-                            
-                            OutlinedButton(
-                                onClick = {
-                                    if (PermissionUtils.hasStoragePermission(context)) {
-                                        galleryLauncher.launch("image/*")
-                                    } else {
-                                        // Request storage permission
-                                        hasPermission.value = false
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = "Select from Gallery")
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Gallery")
-                            }
-                        }
+                        // Attach Button
+                        ImageAttachButton(
+                            onImageSelected = { imagePath ->
+                                selectedImages = selectedImages + imagePath
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            currentCount = selectedImages.size
+                        )
                         
                         // Show selected images if any
                         if (selectedImages.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            
-                            // Show photo count
-                            Text(
-                                text = "${selectedImages.size} photo(s) selected",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            // Show selected photos as chips
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            var previewUri by remember { mutableStateOf<String?>(null) }
+                            var showClearAllDialog by remember { mutableStateOf(false) }
+
+                            // Header with count
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
+                                Text(
+                                    text = "${selectedImages.size} photo(s)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Tap to preview • Tap × to remove",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                TextButton(onClick = { showClearAllDialog = true }) {
+                                    Text("Clear all")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Thumbnails row
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(selectedImages) { imagePath ->
-                                    AssistChip(
-                                        onClick = { },
-                                        label = { 
-                                            Text(
-                                                text = imagePath.substringAfterLast("/").substringBeforeLast("."),
-                                                maxLines = 1
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            IconButton(
-                                                onClick = {
-                                                    selectedImages = selectedImages.filter { it != imagePath }
+                                    val context = LocalContext.current
+                                    var bitmapState by remember(imagePath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+
+                                    LaunchedEffect(imagePath) {
+                                        bitmapState = withContext(Dispatchers.IO) {
+                                            try {
+                                                val uri = Uri.parse(imagePath)
+                                                context.contentResolver.openInputStream(uri)?.use { input ->
+                                                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = false; inSampleSize = 4 }
+                                                    BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
                                                 }
+                                            } catch (_: Exception) { null }
+                                        }
+                                    }
+
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(96.dp)
+                                                .clickable { previewUri = imagePath },
+                                            contentAlignment = Alignment.TopEnd
+                                        ) {
+                                            if (bitmapState != null) {
+                                                Image(
+                                                    bitmap = bitmapState!!,
+                                                    contentDescription = "Photo",
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = { selectedImages = selectedImages.filter { it != imagePath } },
+                                                modifier = Modifier
+                                                    .padding(4.dp)
+                                                    .size(24.dp)
                                             ) {
                                                 Icon(
-                                                    Icons.Default.Delete,
+                                                    Icons.Default.Close,
                                                     contentDescription = "Remove photo",
-                                                    modifier = Modifier.size(16.dp)
+                                                    tint = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
                                         }
-                                    )
+                                    }
                                 }
+                            }
+
+                            // Preview dialog
+                            if (previewUri != null) {
+                                AlertDialog(
+                                    onDismissRequest = { previewUri = null },
+                                    text = {
+                                        val context = LocalContext.current
+                                        var fullBitmap by remember(previewUri) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+                                        LaunchedEffect(previewUri) {
+                                            fullBitmap = withContext(Dispatchers.IO) {
+                                                try {
+                                                    val uri = Uri.parse(previewUri)
+                                                    context.contentResolver.openInputStream(uri)?.use { input ->
+                                                        BitmapFactory.decodeStream(input)?.asImageBitmap()
+                                                    }
+                                                } catch (_: Exception) { null }
+                                            }
+                                        }
+                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                            if (fullBitmap != null) {
+                                                Image(bitmap = fullBitmap!!, contentDescription = "Preview")
+                                            } else {
+                                                CircularProgressIndicator()
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        TextButton(onClick = { previewUri = null }) { Text("Close") }
+                                    }
+                                )
+                            }
+
+                            // Clear all confirmation dialog
+                            if (showClearAllDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showClearAllDialog = false },
+                                    title = { Text("Remove all images?") },
+                                    text = { Text("This will remove all attached images from this defect.") },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            selectedImages = emptyList()
+                                            showClearAllDialog = false
+                                        }) { Text("Remove") }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showClearAllDialog = false }) { Text("Cancel") }
+                                    }
+                                )
                             }
                         }
                     }

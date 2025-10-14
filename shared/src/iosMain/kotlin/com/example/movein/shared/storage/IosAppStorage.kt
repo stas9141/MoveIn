@@ -14,6 +14,7 @@ actual class AppStorage {
         userDefaults.setInteger(userData.bathrooms.toLong(), "bathrooms")
         userDefaults.setInteger(userData.parking.toLong(), "parking")
         userDefaults.setBool(userData.warehouse, "warehouse")
+        userDefaults.setBool(userData.garden, "garden")
         userDefaults.setInteger(userData.balconies.toLong(), "balconies")
         userDefaults.synchronize()
     }

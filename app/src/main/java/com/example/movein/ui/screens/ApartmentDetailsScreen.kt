@@ -1,6 +1,7 @@
 package com.example.movein.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,12 +16,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.movein.shared.data.UserData
+import com.example.movein.ui.components.ContextualLoginPrompt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApartmentDetailsScreen(
     onContinueClick: (UserData) -> Unit,
     onBackClick: () -> Unit,
+    onSignUpClick: () -> Unit,
+    onSignInClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedRooms by remember { mutableStateOf(setOf("Salon + Kitchen", "Mamad")) }
@@ -28,20 +32,31 @@ fun ApartmentDetailsScreen(
     var bathrooms by remember { mutableStateOf(1) }
     var parking by remember { mutableStateOf(1) }
     var warehouse by remember { mutableStateOf(false) }
+    var garden by remember { mutableStateOf(false) }
     var balconies by remember { mutableStateOf(1) }
     
     var showBedroomDialog by remember { mutableStateOf(false) }
     var showBathroomDialog by remember { mutableStateOf(false) }
     var showParkingDialog by remember { mutableStateOf(false) }
     var showBalconyDialog by remember { mutableStateOf(false) }
+    var showLoginPrompt by remember { mutableStateOf(false) }
+    
+    // Store the user data for later use
+    var pendingUserData by remember { mutableStateOf<UserData?>(null) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Scrollable content
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         // Header with back button
         Row(
             modifier = Modifier
@@ -176,7 +191,9 @@ fun ApartmentDetailsScreen(
                         onValueChange = { },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showBedroomDialog) },
-                        modifier = Modifier.menuAnchor()
+                        modifier = Modifier
+                            .menuAnchor()
+                            .clickable { showBedroomDialog = true }
                     )
                     
                     ExposedDropdownMenu(
@@ -230,7 +247,9 @@ fun ApartmentDetailsScreen(
                         onValueChange = { },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showBathroomDialog) },
-                        modifier = Modifier.menuAnchor()
+                        modifier = Modifier
+                            .menuAnchor()
+                            .clickable { showBathroomDialog = true }
                     )
                     
                     ExposedDropdownMenu(
@@ -284,7 +303,9 @@ fun ApartmentDetailsScreen(
                         onValueChange = { },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showBalconyDialog) },
-                        modifier = Modifier.menuAnchor()
+                        modifier = Modifier
+                            .menuAnchor()
+                            .clickable { showBalconyDialog = true }
                     )
                     
                     ExposedDropdownMenu(
@@ -338,7 +359,9 @@ fun ApartmentDetailsScreen(
                         onValueChange = { },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showParkingDialog) },
-                        modifier = Modifier.menuAnchor()
+                        modifier = Modifier
+                            .menuAnchor()
+                            .clickable { showParkingDialog = true }
                     )
                     
                     ExposedDropdownMenu(
@@ -396,6 +419,44 @@ fun ApartmentDetailsScreen(
             }
         }
 
+        // Garden (Gina)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Garden (Gina)",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                    Text(
+                        text = "Do you have a garden?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Switch(
+                    checked = garden,
+                    onCheckedChange = { garden = it }
+                )
+            }
+        }
+        } // End of scrollable content
+
         // Continue Button
         Button(
             onClick = {
@@ -405,9 +466,11 @@ fun ApartmentDetailsScreen(
                     bathrooms = bathrooms,
                     parking = parking,
                     warehouse = warehouse,
+                    garden = garden,
                     balconies = balconies
                 )
-                onContinueClick(userData)
+                pendingUserData = userData
+                showLoginPrompt = true
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -424,6 +487,24 @@ fun ApartmentDetailsScreen(
             )
         }
         
-
+        // Contextual Login Prompt
+        ContextualLoginPrompt(
+            isVisible = showLoginPrompt,
+            onSignUpClick = {
+                showLoginPrompt = false
+                onSignUpClick()
+            },
+            onSignInClick = {
+                showLoginPrompt = false
+                onSignInClick()
+            },
+            onDismissClick = {
+                showLoginPrompt = false
+                // Continue without account - proceed to dashboard
+                pendingUserData?.let { userData ->
+                    onContinueClick(userData)
+                }
+            }
+        )
     }
 }

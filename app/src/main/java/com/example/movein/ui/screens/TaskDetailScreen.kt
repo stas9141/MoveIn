@@ -3,19 +3,24 @@ package com.example.movein.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
@@ -32,7 +37,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,6 +60,7 @@ import com.example.movein.ui.components.SaveCancelButtons
 import com.example.movein.utils.formatTaskStatus
 import com.example.movein.ui.components.EnhancedDatePicker
 import com.example.movein.ui.components.TaskStatusDropdown
+import com.example.movein.utils.CategoryUtils
 import java.util.*
 
 @Composable
@@ -61,6 +70,7 @@ fun TaskDetailScreen(
     onTaskUpdate: (ChecklistItem) -> Unit,
     onTaskDuplicate: (ChecklistItem) -> Unit,
     onTaskDelete: (String) -> Unit,
+    userData: com.example.movein.shared.data.UserData? = null,
     modifier: Modifier = Modifier
 ) {
     var currentTask by remember { mutableStateOf(task) }
@@ -158,10 +168,11 @@ fun TaskDetailScreen(
             }
             
             Text(
-                text = "Task Details",
+                text = if (isEditing) "Edit Task" else "Task Details",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
+                color = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             
@@ -188,7 +199,7 @@ fun TaskDetailScreen(
         
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -197,8 +208,14 @@ fun TaskDetailScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = if (isEditing) 
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                        else 
+                            MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    border = if (isEditing) 
+                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    else null
                 ) {
                     Row(
                         modifier = Modifier
@@ -219,19 +236,56 @@ fun TaskDetailScreen(
                         Column(
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = currentTask.title,
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            
-                            Text(
-                                text = currentTask.category,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
+                            if (isEditing) {
+                                // Editable title with better styling
+                                OutlinedTextField(
+                                    value = currentTask.title,
+                                    onValueChange = { newTitle ->
+                                        currentTask = currentTask.copy(title = newTitle)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = { Text("Enter task title") },
+                                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                    ),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Text,
+                                        imeAction = ImeAction.Next
+                                    )
+                                )
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                // Category dropdown with better styling
+                                CategoryDropdown(
+                                    currentCategory = currentTask.category,
+                                    onCategoryChange = { newCategory ->
+                                        currentTask = currentTask.copy(category = newCategory)
+                                    },
+                                    userData = userData
+                                )
+                            } else {
+                                Text(
+                                    text = currentTask.title,
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                
+                                Text(
+                                    text = currentTask.category,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
                             
                             Spacer(modifier = Modifier.height(4.dp))
                             
@@ -290,10 +344,37 @@ fun TaskDetailScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        Text(
-                            text = currentTask.description,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = currentTask.description,
+                                onValueChange = { newDescription ->
+                                    currentTask = currentTask.copy(description = newDescription)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Enter task description") },
+                                minLines = 3,
+                                maxLines = 6,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Done
+                                )
+                            )
+                        } else {
+                            Text(
+                                text = currentTask.description.ifEmpty { "No description provided" },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (currentTask.description.isEmpty()) 
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                else 
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -569,6 +650,67 @@ fun TaskDetailScreen(
             }
         }
         
+        // Save/Cancel buttons when editing
+        if (isEditing) {
+            SaveCancelButtons(
+                onSave = saveChanges,
+                onCancel = cancelChanges
+            )
+        }
+        
+        // Delete confirmation dialog
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { 
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete Task")
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Are you sure you want to delete this task?",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "This action cannot be undone.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            deleteTask()
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+        
         // Priority Dialog
         if (showPriorityDialog) {
             AlertDialog(
@@ -648,67 +790,6 @@ fun TaskDetailScreen(
                 }
             )
         }
-        
-        // Save/Cancel buttons when editing
-        if (isEditing && hasChanges) {
-            SaveCancelButtons(
-                onSave = saveChanges,
-                onCancel = cancelChanges
-            )
-        }
-        
-        // Delete confirmation dialog
-        if (showDeleteDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
-                title = { 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete Task")
-                    }
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = "Are you sure you want to delete this task?",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "This action cannot be undone.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            deleteTask()
-                            showDeleteDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Delete")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
     }
 }
 
@@ -730,9 +811,9 @@ fun AttachmentItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (attachment.type == "image") Icons.Default.Check else Icons.Default.MoreVert,
+                imageVector = if (attachment.type == "image") Icons.Default.Star else Icons.Default.Info,
                 contentDescription = "Attachment",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = if (attachment.type == "image") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(end = 8.dp)
             )
             
@@ -784,21 +865,47 @@ fun AttachmentDialog(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                    Text("Add Image")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Star, 
+                            contentDescription = null, 
+                            modifier = Modifier.padding(end = 8.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Add Image",
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 Button(
                     onClick = onAddFile,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                    Text("Add File")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Info, 
+                            contentDescription = null, 
+                            modifier = Modifier.padding(end = 8.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            "Add File",
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
         },
@@ -896,5 +1003,58 @@ fun SubTaskItem(
         }
         
         // Save/Cancel buttons when editing - added above
+    }
+}
+
+@Composable
+fun CategoryDropdown(
+    currentCategory: String,
+    onCategoryChange: (String) -> Unit,
+    userData: com.example.movein.shared.data.UserData? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    // Dynamic task categories based on user's apartment details
+    val categories = CategoryUtils.getAvailableTaskCategories(userData)
+    
+    Box {
+        OutlinedTextField(
+            value = currentCategory,
+            onValueChange = { },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true },
+            placeholder = { Text("Select category") },
+            readOnly = true,
+            trailingIcon = {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Select category"
+                    )
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+        )
+        
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category) },
+                    onClick = {
+                        onCategoryChange(category)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }

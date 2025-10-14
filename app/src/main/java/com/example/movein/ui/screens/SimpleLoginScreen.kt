@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -26,17 +31,31 @@ fun SimpleLoginScreen(
     onSignInClick: (email: String, password: String) -> Unit,
     onSignUpClick: () -> Unit,
     onGoogleSignInClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit,
+    onBiometricSignInClick: () -> Unit = {},
     isLoading: Boolean = false,
     error: String? = null,
     googleSignInError: String? = null,
+    biometricError: String? = null,
     onDismissError: (() -> Unit)? = null,
     onDismissGoogleError: (() -> Unit)? = null,
+    onDismissBiometricError: (() -> Unit)? = null,
+    isBiometricAvailable: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    
+    // Focus requesters for keyboard management
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    
+    // Auto-focus email field when screen loads
+    LaunchedEffect(Unit) {
+        emailFocusRequester.requestFocus()
+    }
     
     Column(
         modifier = modifier
@@ -84,6 +103,9 @@ fun SimpleLoginScreen(
         
         // Error Messages
         error?.let { errorMessage ->
+            // Debug logging
+            println("SimpleLoginScreen: Displaying error: $errorMessage")
+            
             val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
             val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
             
@@ -94,6 +116,9 @@ fun SimpleLoginScreen(
                 showRecoverySuggestion = true
             )
             Spacer(modifier = Modifier.height(16.dp))
+        } ?: run {
+            // Debug: Log when no error is present
+            println("SimpleLoginScreen: No error to display")
         }
         
         // Google Sign-In Error Message
@@ -110,6 +135,20 @@ fun SimpleLoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
         
+        // Biometric Error Message
+        biometricError?.let { errorMessage ->
+            val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
+            val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
+            
+            ErrorDisplay(
+                error = userFriendlyError,
+                errorType = errorType,
+                onDismiss = onDismissBiometricError,
+                showRecoverySuggestion = true
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        
         // Email Field
         OutlinedTextField(
             value = email,
@@ -118,8 +157,16 @@ fun SimpleLoginScreen(
             leadingIcon = {
                 Icon(Icons.Default.Email, contentDescription = "Email")
             },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(emailFocusRequester),
             singleLine = true
         )
         
@@ -139,8 +186,22 @@ fun SimpleLoginScreen(
                 }
             },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (email.isNotBlank() && password.isNotBlank()) {
+                        scope.launch {
+                            onSignInClick(email, password)
+                        }
+                    }
+                }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(passwordFocusRequester),
             singleLine = true
         )
         
@@ -171,6 +232,20 @@ fun SimpleLoginScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
+        // Forgot Password Link
+        TextButton(
+            onClick = onForgotPasswordClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Forgot Password?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // Google Sign In Button
         OutlinedButton(
             onClick = {
@@ -185,6 +260,36 @@ fun SimpleLoginScreen(
             enabled = !isLoading
         ) {
             Text("Sign in with Google")
+        }
+        
+        // Biometric Sign In Button (only show if biometric is available)
+        if (isBiometricAvailable) {
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedButton(
+                onClick = {
+                    // Clear any existing errors when attempting to sign in
+                    onDismissError?.invoke()
+                    onDismissBiometricError?.invoke()
+                    scope.launch {
+                        onBiometricSignInClick()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Biometric",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text("Sign in with Biometric")
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(32.dp))

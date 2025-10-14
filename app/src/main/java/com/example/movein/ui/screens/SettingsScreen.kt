@@ -1,5 +1,6 @@
 package com.example.movein.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -9,6 +10,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,8 +35,11 @@ fun SettingsScreen(
     syncStatus: SyncStatus,
     onForceSync: () -> Unit,
     onSignOut: () -> Unit,
+    onLogoutAllDevices: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showClearDataDialog by remember { mutableStateOf(false) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(true) }
     Column(
         modifier = modifier.fillMaxSize()
@@ -67,6 +73,88 @@ fun SettingsScreen(
                         contentDescription = "Start Tutorial",
                         tint = MaterialTheme.colorScheme.primary
                     )
+                }
+            }
+        }
+        
+        // User Profile Section
+        if (authState.isAuthenticated && authState.email != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Profile Avatar
+                    Card(
+                        modifier = Modifier.size(60.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    
+                    // User Information
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Welcome back!",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = "Email",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = authState.email ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text(
+                            text = "Your account is securely synced",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
         }
@@ -231,8 +319,8 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             
-                            Button(
-                                onClick = onSignOut,
+                Button(
+                                onClick = { showSignOutDialog = true },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer
                                 ),
@@ -241,6 +329,22 @@ fun SettingsScreen(
                                 Text(
                                     text = "Sign Out",
                                     color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedButton(
+                                onClick = onLogoutAllDevices,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "Log out of all devices",
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
                         }
@@ -298,20 +402,20 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Button(
-                            onClick = onClearData,
+                            onClick = { showClearDataDialog = true },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Clear All Data",
+                                text = "Clear User Data",
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                         
                         Text(
-                            text = "Reorganize: Moves tasks to correct hosts based on due dates. Clear: Removes all data.",
+                            text = "Reorganize: Moves tasks to correct hosts based on due dates. Clear: Removes your personal data only.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
@@ -363,5 +467,98 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+    
+    // Clear All Data Confirmation Dialog
+    if (showClearDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            title = {
+                Text(
+                    text = "Clear User Data",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Text(
+                    text = "This will permanently delete your personal data including:\n\n" +
+                            "• User profile and apartment details\n" +
+                            "• Your custom tasks and notes\n" +
+                            "• All defects and reports you created\n" +
+                            "• Authentication tokens\n\n" +
+                            "Predefined tasks will remain available.\n\n" +
+                            "Are you sure you want to continue?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearDataDialog = false
+                        onClearData()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        text = "Yes, Clear Data",
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showClearDataDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Sign Out Confirmation Dialog
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = {
+                Text(
+                    text = "Sign Out",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to sign out?\n\n" +
+                            "You will need to sign in again to access your data.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSignOutDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        text = "Sign Out",
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showSignOutDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

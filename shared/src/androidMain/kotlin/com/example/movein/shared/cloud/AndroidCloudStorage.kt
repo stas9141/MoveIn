@@ -22,6 +22,12 @@ actual class CloudStorage(private val context: Context) {
     private val _authState = MutableStateFlow(AuthState(false))
     private val _syncStatus = MutableStateFlow(SyncStatus())
     
+    init {
+        println("AndroidCloudStorage: Initializing with context: ${context.packageName}")
+        println("AndroidCloudStorage: FirebaseAuth instance: ${auth.app.name}")
+        println("AndroidCloudStorage: FirebaseFirestore instance: ${firestore.app.name}")
+    }
+    
     private var userDataListener: ListenerRegistration? = null
     private var checklistDataListener: ListenerRegistration? = null
     private var defectsListener: ListenerRegistration? = null
@@ -47,8 +53,22 @@ actual class CloudStorage(private val context: Context) {
             auth.signInWithEmailAndPassword(email, password).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            _authState.value = _authState.value.copy(isLoading = false, error = e.message)
-            Result.failure(e)
+            val errorMessage = when {
+                e.message?.contains("user-not-found") == true -> "No account found with this email. Please sign up first."
+                e.message?.contains("wrong-password") == true -> "Incorrect password. Please try again."
+                e.message?.contains("invalid-email") == true -> "Please enter a valid email address."
+                e.message?.contains("user-disabled") == true -> "This account has been disabled. Please contact support."
+                e.message?.contains("network-request-failed") == true -> "Network error. Please check your internet connection."
+                e.message?.contains("too-many-requests") == true -> "Too many attempts. Please try again later."
+                else -> e.message ?: "Unable to sign in. Please try again."
+            }
+            
+            // Debug logging
+            println("AndroidCloudStorage: Setting error: $errorMessage")
+            println("AndroidCloudStorage: Original error: ${e.message}")
+            
+            _authState.value = _authState.value.copy(isLoading = false, error = errorMessage)
+            Result.failure(Exception(errorMessage))
         }
     }
     
@@ -58,8 +78,16 @@ actual class CloudStorage(private val context: Context) {
             auth.createUserWithEmailAndPassword(email, password).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            _authState.value = _authState.value.copy(isLoading = false, error = e.message)
-            Result.failure(e)
+            val errorMessage = when {
+                e.message?.contains("email-already-in-use") == true -> "This email is already registered. Please try signing in instead."
+                e.message?.contains("invalid-email") == true -> "Please enter a valid email address."
+                e.message?.contains("weak-password") == true -> "Password is too weak. Please choose a stronger password."
+                e.message?.contains("network-request-failed") == true -> "Network error. Please check your internet connection."
+                e.message?.contains("too-many-requests") == true -> "Too many attempts. Please try again later."
+                else -> e.message ?: "Unable to create account. Please try again."
+            }
+            _authState.value = _authState.value.copy(isLoading = false, error = errorMessage)
+            Result.failure(Exception(errorMessage))
         }
     }
     

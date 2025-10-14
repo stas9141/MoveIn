@@ -21,7 +21,12 @@ fun ErrorDisplay(
     showRecoverySuggestion: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    if (error == null) return
+    if (error == null) {
+        println("ErrorDisplay: No error to display")
+        return
+    }
+    
+    println("ErrorDisplay: Displaying error: $error, type: $errorType")
     
     val recoverySuggestion = if (showRecoverySuggestion) {
         com.example.movein.utils.ErrorHandler.getRecoverySuggestion(errorType)

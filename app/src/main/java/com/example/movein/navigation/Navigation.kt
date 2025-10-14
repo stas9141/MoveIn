@@ -4,6 +4,10 @@ sealed class Screen(val route: String) {
     object Welcome : Screen("welcome")
     object Login : Screen("login")
     object SignUp : Screen("signup")
+    object ForgotPassword : Screen("forgot_password")
+    object ResetPassword : Screen("reset_password/{token}") {
+        fun createRoute(token: String) = "reset_password/$token"
+    }
     object ApartmentDetails : Screen("apartment_details")
     object Dashboard : Screen("dashboard")
     object TaskDetail : Screen("task_detail/{taskId}") {

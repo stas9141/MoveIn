@@ -13,4 +13,7 @@ expect class AppStorage {
     
     fun saveDefects(defects: List<Defect>)
     fun loadDefects(): List<Defect>
+    
+    fun clearAllData()
+    fun clearUserData()
 }

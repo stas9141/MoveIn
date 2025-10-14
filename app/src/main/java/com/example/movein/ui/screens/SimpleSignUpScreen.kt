@@ -14,6 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -39,6 +43,16 @@ fun SimpleSignUpScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    
+    // Focus requesters for keyboard management
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val confirmPasswordFocusRequester = remember { FocusRequester() }
+    
+    // Auto-focus email field when screen loads
+    LaunchedEffect(Unit) {
+        emailFocusRequester.requestFocus()
+    }
     
     val isPasswordValid = password.length >= 6
     val isPasswordMatch = password == confirmPassword
@@ -124,8 +138,16 @@ fun SimpleSignUpScreen(
             leadingIcon = {
                 Icon(Icons.Default.Email, contentDescription = "Email")
             },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(emailFocusRequester),
             singleLine = true
         )
         
@@ -145,8 +167,16 @@ fun SimpleSignUpScreen(
                 }
             },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { confirmPasswordFocusRequester.requestFocus() }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(passwordFocusRequester),
             singleLine = true,
             isError = password.isNotBlank() && !isPasswordValid,
             supportingText = if (password.isNotBlank() && !isPasswordValid) {
@@ -170,8 +200,22 @@ fun SimpleSignUpScreen(
                 }
             },
             visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (isFormValid) {
+                        scope.launch {
+                            onSignUpClick(email, password)
+                        }
+                    }
+                }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(confirmPasswordFocusRequester),
             singleLine = true,
             isError = confirmPassword.isNotBlank() && !isPasswordMatch,
             supportingText = if (confirmPassword.isNotBlank() && !isPasswordMatch) {

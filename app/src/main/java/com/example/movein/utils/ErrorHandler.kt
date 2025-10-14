@@ -14,12 +14,32 @@ object ErrorHandler {
         val errorMessage = error.message ?: "An unexpected error occurred"
         
         return when {
+            // Canonical Firebase client messages (exact phrases from tests/SDK)
+            errorMessage.contains("The password is invalid", ignoreCase = true) ||
+            errorMessage.contains("does not have a password", ignoreCase = true) ->
+                "Incorrect password. Please try again."
+
+            errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
+                "No account found with this email. Please sign up first."
+
+            errorMessage.contains("The email address is badly formatted", ignoreCase = true) ->
+                "Please enter a valid email address."
+
+            errorMessage.contains("The user account has been disabled", ignoreCase = true) ->
+                "This account has been disabled. Please contact support."
+
+            errorMessage.contains("Too many unsuccessful login attempts", ignoreCase = true) ->
+                "Too many attempts. Please try again later."
+
+            errorMessage.contains("A network error", ignoreCase = true) ->
+                "Network error. Please check your internet connection."
+
             // Firebase Authentication Errors - More specific handling
             errorMessage.contains("API key not valid", ignoreCase = true) -> 
                 "Unable to connect to authentication service. Please check your internet connection and try again."
             
             errorMessage.contains("network", ignoreCase = true) -> 
-                "Please check your internet connection and try again."
+                "Network error. Please check your internet connection."
             
             errorMessage.contains("timeout", ignoreCase = true) -> 
                 "Request timed out. Please check your connection and try again."
@@ -98,8 +118,8 @@ object ErrorHandler {
             errorMessage.contains("storage", ignoreCase = true) -> 
                 "Storage error occurred. Your data is safe."
             
-            // Default case - return a generic user-friendly message
-            else -> "Something went wrong. Please try again."
+            // Default case - return a generic user-friendly message matching tests
+            else -> "An unexpected error occurred. Please try again."
         }
     }
     
@@ -126,6 +146,13 @@ object ErrorHandler {
         val errorMessage = error.message ?: ""
         
         return when {
+            // Explicit Firebase phrases used in tests
+            errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("The user account has been disabled", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("Too many unsuccessful login attempts", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("The password is invalid", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("The email address is badly formatted", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            
             errorMessage.contains("network", ignoreCase = true) || 
             errorMessage.contains("connection", ignoreCase = true) ||
             errorMessage.contains("timeout", ignoreCase = true) ||
@@ -180,6 +207,26 @@ object ErrorHandler {
         val errorMessage = error.message ?: "An unexpected error occurred"
         
         return when {
+            // Canonical Firebase client messages (exact phrases from tests/SDK)
+            errorMessage.contains("The password is invalid", ignoreCase = true) ||
+            errorMessage.contains("does not have a password", ignoreCase = true) ->
+                "Incorrect password. Please try again."
+
+            errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
+                "No account found with this email. Please sign up first."
+
+            errorMessage.contains("The email address is badly formatted", ignoreCase = true) ->
+                "Please enter a valid email address."
+
+            errorMessage.contains("The user account has been disabled", ignoreCase = true) ->
+                "This account has been disabled. Please contact support."
+
+            errorMessage.contains("Too many unsuccessful login attempts", ignoreCase = true) ->
+                "Too many attempts. Please try again later."
+
+            errorMessage.contains("A network error", ignoreCase = true) ->
+                "Network error. Please check your internet connection."
+
             // Firebase Authentication Errors - Context aware
             errorMessage.contains("API key not valid", ignoreCase = true) -> 
                 if (isSignUp) {
@@ -189,7 +236,7 @@ object ErrorHandler {
                 }
             
             errorMessage.contains("network", ignoreCase = true) -> 
-                "Please check your internet connection and try again."
+                "Network error. Please check your internet connection."
             
             errorMessage.contains("timeout", ignoreCase = true) -> 
                 "Request timed out. Please check your connection and try again."
@@ -280,11 +327,11 @@ object ErrorHandler {
             errorMessage.contains("storage", ignoreCase = true) -> 
                 "Storage error occurred. Your data is safe."
             
-            // Default case - return a generic user-friendly message
+            // Default case - return a generic user-friendly message matching tests
             else -> if (isSignUp) {
                 "Unable to create account. Please try again."
             } else {
-                "Something went wrong. Please try again."
+                "An unexpected error occurred. Please try again."
             }
         }
     }
