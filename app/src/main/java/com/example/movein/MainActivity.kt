@@ -57,6 +57,7 @@ import com.example.movein.auth.GoogleSignInHelper
 import com.example.movein.auth.AuthManager
 import com.example.movein.auth.BiometricAuthManager
 import com.example.movein.utils.ErrorHandler
+import com.example.movein.auth.SecureTokenStorage
 import com.google.firebase.FirebaseApp
 
 private fun shouldShowBottomNavigation(currentScreen: Screen): Boolean {
@@ -104,8 +105,11 @@ fun MoveInApp() {
     }
     val cloudStorage = remember(context) { 
         try {
-            CloudStorage(context)
+            val storage = CloudStorage(context)
+            Log.d("MainActivity", "CloudStorage initialized successfully")
+            storage
         } catch (e: Exception) {
+            Log.e("MainActivity", "CloudStorage initialization failed", e)
             // Return a mock storage if initialization fails
             null
         }
@@ -265,12 +269,12 @@ fun MoveInApp() {
                     onSignInClick = {
                         appState.navigateTo(Screen.Login)
                     },
-                onTutorialClick = {
-                    tutorialState.showTutorial(
-                        "Welcome to MoveIn!", 
-                        "Your comprehensive home inspection and move-in companion. Navigate through the app to track tasks, defects, and manage your move-in process."
-                    )
-                },
+                    onTutorialClick = {
+                        tutorialState.showTutorial(
+                            "Welcome to MoveIn!", 
+                            "Your comprehensive home inspection and move-in companion. Navigate through the app to track tasks, defects, and manage your move-in process."
+                        )
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -281,13 +285,23 @@ fun MoveInApp() {
                         appState.navigateTo(Screen.Welcome)
                     },
                     onSignInClick = { email, password ->
-                        // Clear any existing errors before attempting sign in
-                        clearAuthError()
+                        Log.d("MainActivity", "Sign-in button clicked with email: ${email.take(3)}***")
+                        Log.d("MainActivity", "CloudStorage available: ${cloudStorage != null}")
+                        
+                        // Clear other errors but keep auth error for display
                         clearGoogleSignInError()
                         clearBiometricError()
                         coroutineScope.launch {
+                            Log.d("MainActivity", "Starting sign-in process...")
                             val result = appState.signIn(email, password)
+                            Log.d("MainActivity", "Sign-in result: ${result.isSuccess}")
+                            
                             if (result.isSuccess) {
+                                Log.d("MainActivity", "Sign-in successful!")
+                                // Clear auth error on successful login
+                                clearAuthError()
+                                // Migrate anonymous data to the signed-in account
+                                appState.migrateAnonymousDataToAccount()
                                 // Enable biometric authentication after successful login
                                 try {
                                     val authManager = AuthManager(context)
@@ -297,6 +311,17 @@ fun MoveInApp() {
                                     Log.e("MainActivity", "Failed to enable biometric authentication", e)
                                 }
                                 appState.navigateTo(Screen.Dashboard)
+                            } else {
+                                // Handle login failure
+                                val error = result.exceptionOrNull()
+                                Log.e("MainActivity", "Sign-In failed: ${error?.message}")
+                                Log.e("MainActivity", "Sign-In error type: ${error?.javaClass?.simpleName}")
+                                // The error is already handled by AndroidCloudStorage and stored in authState
+                                // The SimpleLoginScreen will display it automatically via appState.authState.error
+                                
+                                // Ensure error is visible by logging it
+                                Log.d("MainActivity", "AuthState error: ${appState.authState.error}")
+                                Log.d("MainActivity", "AuthState isLoading: ${appState.authState.isLoading}")
                             }
                         }
                     },
@@ -316,6 +341,8 @@ fun MoveInApp() {
                             Log.d("MainActivity", "Google Sign-In result: ${result.isSuccess}")
                             coroutineScope.launch {
                                 if (result.isSuccess) {
+                                    // Migrate anonymous data to the Google account
+                                    appState.migrateAnonymousDataToAccount()
                                     // Enable biometric authentication after successful Google login
                                     try {
                                         val authManager = AuthManager(context)
@@ -394,6 +421,8 @@ fun MoveInApp() {
                         coroutineScope.launch {
                             val result = appState.signUp(email, password)
                             if (result.isSuccess) {
+                                // Migrate anonymous data to the new account
+                                appState.migrateAnonymousDataToAccount()
                                 appState.navigateTo(Screen.Dashboard)
                             }
                         }
@@ -410,6 +439,8 @@ fun MoveInApp() {
                             Log.d("MainActivity", "Google Sign-In result: ${result.isSuccess}")
                             coroutineScope.launch {
                                 if (result.isSuccess) {
+                                    // Migrate anonymous data to the Google account
+                                    appState.migrateAnonymousDataToAccount()
                                     Log.d("MainActivity", "Navigating to Dashboard")
                                     appState.navigateTo(Screen.Dashboard)
                                 } else {
@@ -521,11 +552,17 @@ fun MoveInApp() {
             Screen.ApartmentDetails -> {
                 ApartmentDetailsScreen(
                     onContinueClick = { userData ->
-                        appState.initializeUserData(userData)
+                        appState.initializeAnonymousUserData(userData)
                         appState.navigateTo(Screen.Dashboard)
                     },
                     onBackClick = {
                         appState.navigateTo(Screen.Welcome)
+                    },
+                    onSignUpClick = {
+                        appState.navigateTo(Screen.SignUp)
+                    },
+                    onSignInClick = {
+                        appState.navigateTo(Screen.Login)
                     },
                     modifier = Modifier.padding(innerPadding)
                 )
@@ -535,7 +572,8 @@ fun MoveInApp() {
                 appState.checklistData?.let { checklistData ->
                     DashboardScreen(
                         checklistData = checklistData,
-                        selectedTabIndex = 0,
+                        selectedTabIndex = appState.lastAddedTaskTab ?: 0,
+                        selectedTaskId = appState.selectedTask?.id,
                         onTaskClick = { task ->
                             appState.selectTask(task)
                             appState.navigateTo(Screen.TaskDetail)
@@ -546,6 +584,7 @@ fun MoveInApp() {
                         onAddTask = { newTask ->
                             appState.addTask(newTask)
                             showAddTaskDialog = false
+                            // Stay on Dashboard; newly added task is selected via addTask()
                         },
                         onDefectListClick = {
                             appState.navigateTo(Screen.DefectList)
@@ -559,6 +598,10 @@ fun MoveInApp() {
                             )
                         },
                         defects = appState.defects,
+                        userEmail = if (appState.authState.isAuthenticated) appState.authState.email else null,
+                        onProfileClick = {
+                            appState.navigateTo(Screen.Settings)
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
                 } ?: run {
@@ -574,10 +617,19 @@ fun MoveInApp() {
                     TaskDetailScreen(
                         task = task,
                         onBackClick = {
+                            appState.clearLastAddedTaskTab()
                             appState.navigateTo(Screen.Dashboard)
                         },
                         onTaskUpdate = { updatedTask ->
                             appState.updateTask(updatedTask)
+                        },
+                        onTaskDuplicate = { duplicatedTask ->
+                            appState.duplicateTask(duplicatedTask)
+                            appState.navigateTo(Screen.Dashboard)
+                        },
+                        onTaskDelete = { taskId ->
+                            appState.deleteTask(taskId)
+                            appState.navigateTo(Screen.Dashboard)
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -649,6 +701,7 @@ fun MoveInApp() {
             Screen.DefectList -> {
                 DefectListScreen(
                     defects = appState.defects,
+                    selectedDefectId = appState.selectedDefect?.id,
                     onDefectClick = { defect ->
                         appState.selectDefect(defect)
                         appState.navigateTo(Screen.DefectDetail)
@@ -670,6 +723,7 @@ fun MoveInApp() {
             Screen.AddEditDefect -> {
                 AddEditDefectScreen(
                     defect = appState.selectedDefect,
+                    initialDueDate = appState.pendingDefectDueDate,
                     userData = appState.userData,
                     onSave = { defect ->
                         if (appState.selectedDefect != null) {
@@ -678,10 +732,13 @@ fun MoveInApp() {
                         } else {
                             appState.addDefect(defect)
                             appState.selectDefect(defect)
-                            appState.navigateTo(Screen.DefectDetail)
+                            // Close add window and return to list with new defect selected
+                            appState.navigateTo(Screen.DefectList)
                         }
+                        appState.clearPendingDefectDueDate()
                     },
                     onBack = {
+                        appState.clearPendingDefectDueDate()
                         appState.navigateTo(Screen.DefectList)
                     },
                     modifier = Modifier.padding(innerPadding)
@@ -697,6 +754,14 @@ fun MoveInApp() {
                         },
                         onDefectUpdate = { updatedDefect ->
                             appState.updateDefect(updatedDefect)
+                        },
+                        onDefectDuplicate = { duplicatedDefect ->
+                            appState.duplicateDefect(duplicatedDefect)
+                            appState.navigateTo(Screen.DefectList)
+                        },
+                        onDefectDelete = { defectId ->
+                            appState.deleteDefect(defectId)
+                            appState.navigateTo(Screen.DefectList)
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -724,9 +789,11 @@ fun MoveInApp() {
                     },
                     onAddTask = { newTask ->
                         appState.addTask(newTask)
+                        // Stay on Calendar/Dashboard context
                     },
                     onAddDefect = { newDefect ->
-                        appState.selectDefect(newDefect)
+                        appState.clearSelectedDefect()
+                        appState.updatePendingDefectDueDate(newDefect.dueDate)
                         appState.navigateTo(Screen.AddEditDefect)
                     },
                     modifier = Modifier.padding(innerPadding)
@@ -766,7 +833,7 @@ fun MoveInApp() {
                     },
                     onSignOut = {
                         coroutineScope.launch {
-                            appState.signOut()
+                            appState.secureLogout()
                         }
                     },
                     onLogoutAllDevices = {

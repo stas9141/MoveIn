@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -53,6 +55,9 @@ fun DashboardScreen(
     defects: List<Defect> = emptyList(),
     showAddTaskDialog: Boolean = false,
     onDismissAddTaskDialog: () -> Unit = {},
+    userEmail: String? = null,
+    onProfileClick: () -> Unit = {},
+    selectedTaskId: String? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(selectedTabIndex) }
@@ -60,6 +65,11 @@ fun DashboardScreen(
     var selectedCategories by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedStatuses by remember { mutableStateOf<List<com.example.movein.shared.data.TaskStatus>>(emptyList()) }
     var selectedPriorities by remember { mutableStateOf<List<Priority>>(emptyList()) }
+    
+    // Update selected tab when selectedTabIndex changes (e.g., when a new task is added)
+    LaunchedEffect(selectedTabIndex) {
+        selectedTab = selectedTabIndex
+    }
     
     // Callback functions for state updates
     val clearFilters = {
@@ -182,7 +192,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    // Header with title and tutorial button
+                    // Header with title, profile, and tutorial button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,6 +206,46 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f)
                         )
+                        
+                        // Profile section
+                        if (userEmail != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // User initials or name
+                                Card(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clickable { onProfileClick() },
+                                    shape = CircleShape,
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = userEmail.take(1).uppercase(),
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                }
+                                
+                                // User email (truncated)
+                                Text(
+                                    text = userEmail.take(15) + if (userEmail.length > 15) "..." else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clickable { onProfileClick() }
+                                )
+                            }
+                        }
                         
                         // Tutorial button
                         onTutorialClick?.let { onTutorial ->
@@ -520,8 +570,29 @@ fun DashboardScreen(
                 }
             }
             
-            // Task Lists
+            // Task Lists with auto-scroll to selected
+            val listState = rememberLazyListState()
+
+            LaunchedEffect(selectedTaskId, selectedTab, activeTasks, completedTasks) {
+                selectedTaskId?.let { id ->
+                    var targetIndex: Int? = null
+                    var position = 0
+                    if (activeTasks.isNotEmpty()) {
+                        position += 1 // header
+                        val idx = activeTasks.indexOfFirst { it.id == id }
+                        if (idx >= 0) targetIndex = position + idx else position += activeTasks.size
+                    }
+                    if (targetIndex == null && completedTasks.isNotEmpty()) {
+                        position += 1 // header for completed block
+                        val idx = completedTasks.indexOfFirst { it.id == id }
+                        if (idx >= 0) targetIndex = position + idx
+                    }
+                    targetIndex?.let { if (it >= 0) listState.animateScrollToItem(it) }
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)

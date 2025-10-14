@@ -17,15 +17,18 @@ import com.example.movein.offline.OfflineStorageManager
 import com.example.movein.offline.SyncStatus as OfflineSyncStatus
 import com.example.movein.navigation.Screen
 import com.example.movein.utils.getTodayString
+import com.example.movein.auth.SecureTokenStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class AppState(
     private val appStorage: AppStorage?,
     private val cloudStorage: CloudStorage?,
     private val offlineStorage: OfflineStorageManager?,
-    private val coroutineScope: CoroutineScope
+    private val coroutineScope: CoroutineScope,
+    private val secureTokenStorage: SecureTokenStorage? = null
 ) {
     var currentScreen by mutableStateOf<Screen>(Screen.Welcome)
         private set
@@ -47,11 +50,23 @@ class AppState(
     var selectedDefect by mutableStateOf<Defect?>(null)
         private set
     
+    var lastAddedTaskTab by mutableStateOf<Int?>(null)
+        private set
+    
+    var pendingDefectDueDate by mutableStateOf<String?>(null)
+        private set
+    
     var isDarkMode by mutableStateOf(false)
         private set
     
     // Authentication state
     var authState by mutableStateOf(AuthState(false))
+    
+    // Anonymous user support
+    var isAnonymousUser by mutableStateOf(true)
+    
+    // Pending data for migration when user signs up
+    var pendingUserData by mutableStateOf<UserData?>(null)
         private set
     
     // Cloud sync status
@@ -209,6 +224,141 @@ class AppState(
             appStorage?.saveChecklistData(checklistData!!)
         }
     }
+    
+    fun initializeAnonymousUserData(data: UserData) {
+        userData = data
+        isAnonymousUser = true
+        // Generate personalized checklist based on user data
+        checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(data)
+        
+        // Save to local storage only (no cloud sync for anonymous users)
+        appStorage?.saveUserData(data)
+        appStorage?.saveChecklistData(checklistData!!)
+    }
+    
+    fun migrateAnonymousDataToAccount() {
+        if (isAnonymousUser && userData != null && checklistData != null) {
+            // Migrate data to cloud storage
+            if (offlineStorage != null) {
+                coroutineScope.launch {
+                    offlineStorage.saveUserData(userData!!)
+                    offlineStorage.saveChecklistData(checklistData!!)
+                    // Also migrate any defects
+                    offlineStorage.saveDefects(defects)
+                }
+            }
+            isAnonymousUser = false
+        }
+    }
+    
+    /**
+     * Check for stored credentials and attempt automatic login
+     */
+    suspend fun checkForStoredCredentials(): Boolean {
+        return secureTokenStorage?.let { storage ->
+            try {
+                if (storage.hasStoredCredentials() && !storage.isAccessTokenExpired()) {
+                    // User has valid stored credentials, log them in automatically
+                    val userData = storage.getStoredUserData()
+                    val email = userData["email"] as? String
+                    val userId = userData["userId"] as? String
+                    
+                    if (email != null && userId != null) {
+                        // Set authentication state
+                        authState = AuthState(true, email, userId)
+                        isAnonymousUser = false
+                        
+                        // Load user data from cloud
+                        loadUserDataFromCloud()
+                        
+                        // Navigate to dashboard
+                        currentScreen = Screen.Dashboard
+                        return true
+                    }
+                } else if (storage.hasStoredCredentials() && storage.getRefreshToken() != null) {
+                    // Access token expired but refresh token exists, try to refresh
+                    return attemptTokenRefresh()
+                }
+            } catch (e: Exception) {
+                // Clear invalid stored credentials
+                storage.clearTokens()
+            }
+            false
+        } ?: false
+    }
+    
+    /**
+     * Attempt to refresh access token using refresh token
+     */
+    private suspend fun attemptTokenRefresh(): Boolean {
+        return secureTokenStorage?.let { storage ->
+            try {
+                val refreshToken = storage.getRefreshToken()
+                if (refreshToken != null) {
+                    // For now, just clear tokens and return false
+                    // TODO: Implement proper token refresh with backend
+                    storage.clearTokens()
+                }
+            } catch (e: Exception) {
+                // Refresh failed, clear tokens
+                storage.clearTokens()
+            }
+            false
+        } ?: false
+    }
+    
+    /**
+     * Load user data from cloud storage
+     */
+    private suspend fun loadUserDataFromCloud() {
+        try {
+            // Load user data
+            val cloudUserDataResult = cloudStorage?.loadUserData()
+            if (cloudUserDataResult?.isSuccess == true) {
+                userData = cloudUserDataResult.getOrNull()
+            }
+            
+            // Load checklist data
+            val cloudChecklistDataResult = cloudStorage?.loadChecklistData()
+            if (cloudChecklistDataResult?.isSuccess == true) {
+                checklistData = cloudChecklistDataResult.getOrNull()
+            }
+            
+            // Load defects
+            val cloudDefectsResult = cloudStorage?.loadDefects()
+            if (cloudDefectsResult?.isSuccess == true) {
+                defects = cloudDefectsResult.getOrNull() ?: emptyList()
+            }
+        } catch (e: Exception) {
+            // Handle error - could fall back to local data
+        }
+    }
+    
+    /**
+     * Secure logout - clears all tokens and returns to welcome screen
+     */
+    suspend fun secureLogout() {
+        try {
+            // Clear tokens from secure storage
+            secureTokenStorage?.clearTokens()
+            
+            // Clear authentication state
+            authState = AuthState(false)
+            isAnonymousUser = true
+            
+            // Clear user data
+            userData = null
+            checklistData = null
+            defects = emptyList()
+            
+            // Navigate to welcome screen
+            currentScreen = Screen.Welcome
+            clearNavigationStack()
+            
+        } catch (e: Exception) {
+            // Handle error
+        }
+    }
 
     fun updateTask(task: ChecklistItem) {
         val currentUserData = userData ?: return
@@ -272,6 +422,18 @@ class AppState(
         selectedDefect = null
     }
     
+    fun clearLastAddedTaskTab() {
+        lastAddedTaskTab = null
+    }
+    
+    fun updatePendingDefectDueDate(dueDate: String?) {
+        pendingDefectDueDate = dueDate
+    }
+    
+    fun clearPendingDefectDueDate() {
+        pendingDefectDueDate = null
+    }
+    
     fun addDefect(defect: Defect) {
         defects = defects + defect
         
@@ -323,6 +485,37 @@ class AppState(
         }
     }
     
+    fun duplicateDefect(defect: Defect) {
+        addDefect(defect)
+    }
+    
+    fun deleteTask(taskId: String) {
+        val currentData = checklistData ?: return
+        
+        // Remove the task from all lists
+        val updatedData = currentData.copy(
+            firstWeek = currentData.firstWeek.filter { it.id != taskId },
+            firstMonth = currentData.firstMonth.filter { it.id != taskId },
+            firstYear = currentData.firstYear.filter { it.id != taskId }
+        )
+        
+        checklistData = updatedData
+        
+        // Save to offline storage if available, otherwise fallback to local storage
+        if (offlineStorage != null) {
+            coroutineScope.launch {
+                offlineStorage.saveChecklistData(checklistData!!)
+            }
+        } else {
+            // Fallback to local storage
+            appStorage?.saveChecklistData(checklistData!!)
+        }
+    }
+    
+    fun duplicateTask(task: ChecklistItem) {
+        addTask(task)
+    }
+    
     fun addTask(newTask: ChecklistItem) {
         val currentData = checklistData ?: return
         
@@ -338,6 +531,13 @@ class AppState(
         }
         
         checklistData = updatedData
+        
+        // Track which tab the task was added to
+        lastAddedTaskTab = targetHost
+        
+        // Automatically select the newly added task
+        selectTask(newTask)
+        
         // Save to storage
         appStorage?.saveChecklistData(checklistData!!)
         
@@ -432,9 +632,12 @@ class AppState(
     
     // Cloud sync methods
     suspend fun signIn(email: String, password: String): Result<Unit> {
+        println("AppState.signIn: CloudStorage available: ${cloudStorage != null}")
         return if (cloudStorage != null) {
+            println("AppState.signIn: Calling cloudStorage.signIn")
             cloudStorage.signIn(email, password)
         } else {
+            println("AppState.signIn: CloudStorage is null, returning failure")
             Result.failure(Exception("Firebase Authentication is not available. Please check your internet connection and try again."))
         }
     }
@@ -453,12 +656,8 @@ class AppState(
 
     suspend fun signOut(): Result<Unit> {
         return try {
-            // Sign out from cloud storage
-            cloudStorage?.signOut()
-            
-            // Navigate to login screen
-            navigateTo(Screen.Login)
-            
+            // Perform a secure logout that clears tokens, state, and back stack
+            secureLogout()
             Result.success(Unit)
         } catch (e: Exception) {
             println("Error signing out: ${e.message}")

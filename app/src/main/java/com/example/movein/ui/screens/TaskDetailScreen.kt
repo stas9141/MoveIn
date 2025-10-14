@@ -48,6 +48,7 @@ import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
 import com.example.movein.utils.formatPriority
 import com.example.movein.utils.formatDateForDisplay
+import com.example.movein.ui.components.SaveCancelButtons
 import com.example.movein.utils.formatTaskStatus
 import com.example.movein.ui.components.EnhancedDatePicker
 import com.example.movein.ui.components.TaskStatusDropdown
@@ -58,6 +59,8 @@ fun TaskDetailScreen(
     task: ChecklistItem,
     onBackClick: () -> Unit,
     onTaskUpdate: (ChecklistItem) -> Unit,
+    onTaskDuplicate: (ChecklistItem) -> Unit,
+    onTaskDelete: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var currentTask by remember { mutableStateOf(task) }
@@ -71,6 +74,7 @@ fun TaskDetailScreen(
     var showAttachmentDialog by remember { mutableStateOf(false) }
     var editingSubTaskId by remember { mutableStateOf<String?>(null) }
     var editingSubTaskText by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     
     // Helper functions for sub-task editing
     val startEditingSubTask = { subTaskId: String, currentText: String ->
@@ -117,6 +121,23 @@ fun TaskDetailScreen(
         isEditing = true
     }
     
+    val duplicateTask = {
+        val duplicatedTask = currentTask.copy(
+            id = UUID.randomUUID().toString(),
+            title = "${currentTask.title} (Copy)",
+            status = com.example.movein.shared.data.TaskStatus.OPEN,
+            isCompleted = false,
+            subTasks = currentTask.subTasks.map { subTask ->
+                subTask.copy(id = UUID.randomUUID().toString(), isCompleted = false)
+            }
+        )
+        onTaskDuplicate(duplicatedTask)
+    }
+    
+    val deleteTask = {
+        onTaskDelete(currentTask.id)
+    }
+    
     // Track changes
     LaunchedEffect(currentTask, newNoteText) {
         hasChanges = currentTask != originalTask || newNoteText != originalTask.notes
@@ -144,10 +165,23 @@ fun TaskDetailScreen(
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             
-            // Edit button
+            // Action buttons
             if (!isEditing) {
-                IconButton(onClick = startEditing) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit Task")
+                Row {
+                    // Duplicate button
+                    IconButton(onClick = duplicateTask) {
+                        Icon(Icons.Default.Add, contentDescription = "Duplicate Task")
+                    }
+                    
+                    // Edit button
+                    IconButton(onClick = startEditing) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Task")
+                    }
+                    
+                    // Delete button
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Task")
+                    }
                 }
             }
         }
@@ -622,6 +656,59 @@ fun TaskDetailScreen(
                 onCancel = cancelChanges
             )
         }
+        
+        // Delete confirmation dialog
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { 
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete Task")
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Are you sure you want to delete this task?",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "This action cannot be undone.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            deleteTask()
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -670,82 +757,6 @@ fun AttachmentItem(
         }
         
         // Save/Cancel buttons when editing - needs proper scope
-    }
-}
-
-@Composable
-fun SaveCancelButtons(
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Cancel Button
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Cancel",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-            }
-            
-            // Save Button
-            Button(
-                onClick = onSave,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Save",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                    
-                    Text(
-                        text = "Save Changes",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        }
     }
 }
 

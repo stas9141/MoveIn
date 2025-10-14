@@ -2,7 +2,10 @@ package com.example.movein.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.items
@@ -15,6 +18,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.*
@@ -33,12 +38,18 @@ import com.example.movein.shared.data.Priority
 import com.example.movein.shared.data.DefectStatus
 import com.example.movein.shared.data.DefectCategory
 import com.example.movein.ui.components.PriorityDropdown
+import com.example.movein.ui.components.SaveCancelButtons
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.getTodayString
 import com.example.movein.utils.getTomorrowString
 import com.example.movein.utils.getNextWeekString
 import com.example.movein.utils.formatDateForDisplay
 import com.example.movein.ui.components.EnhancedDatePicker
+import com.example.movein.utils.PermissionUtils
+import com.example.movein.utils.ImageUtils
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import java.util.*
 
 @Composable
@@ -46,6 +57,8 @@ fun DefectDetailScreen(
     defect: Defect,
     onBackClick: () -> Unit,
     onDefectUpdate: (Defect) -> Unit,
+    onDefectDuplicate: (Defect) -> Unit,
+    onDefectDelete: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var currentDefect by remember { mutableStateOf(defect) }
@@ -60,6 +73,35 @@ fun DefectDetailScreen(
     var showRemoveAllDialog by remember { mutableStateOf(false) }
     var editingSubTaskId by remember { mutableStateOf<String?>(null) }
     var editingSubTaskText by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    
+    // Photo functionality
+    val context = LocalContext.current
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val timestamp = System.currentTimeMillis()
+            val newImages = currentDefect.images + "Camera_${timestamp}.jpg"
+            currentDefect = currentDefect.copy(images = newImages)
+        }
+    }
+    
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val timestamp = System.currentTimeMillis()
+            val newImages = currentDefect.images + "Gallery_${timestamp}.jpg"
+            currentDefect = currentDefect.copy(images = newImages)
+        }
+    }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Handle permission results
+    }
     
     // Save and cancel functions
     val saveChanges = {
@@ -78,6 +120,23 @@ fun DefectDetailScreen(
     
     val startEditing = {
         isEditing = true
+    }
+    
+    val duplicateDefect = {
+        val duplicatedDefect = currentDefect.copy(
+            id = UUID.randomUUID().toString(),
+            location = "${currentDefect.location} (Copy)",
+            status = DefectStatus.OPEN,
+            closedAt = null,
+            subTasks = currentDefect.subTasks.map { subTask ->
+                subTask.copy(id = UUID.randomUUID().toString(), isCompleted = false)
+            }
+        )
+        onDefectDuplicate(duplicatedDefect)
+    }
+    
+    val deleteDefect = {
+        onDefectDelete(currentDefect.id)
     }
     
     // Track changes
@@ -140,10 +199,23 @@ fun DefectDetailScreen(
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             
-            // Edit button
+            // Action buttons
             if (!isEditing) {
-                IconButton(onClick = startEditing) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit Defect")
+                Row {
+                    // Duplicate button
+                    IconButton(onClick = duplicateDefect) {
+                        Icon(Icons.Default.Add, contentDescription = "Duplicate Defect")
+                    }
+                    
+                    // Edit button
+                    IconButton(onClick = startEditing) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Defect")
+                    }
+                    
+                    // Delete button
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Defect")
+                    }
                 }
             }
         }
@@ -256,13 +328,31 @@ fun DefectDetailScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text(
-                            text = currentDefect.location,
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = currentDefect.location,
+                                onValueChange = { newLocation ->
+                                    currentDefect = currentDefect.copy(location = newLocation)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Enter defect location") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { /* Handle next action */ }
+                                )
+                            )
+                        } else {
+                            Text(
+                                text = currentDefect.location,
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                         
                         Text(
                             text = formatCategory(currentDefect.category),
@@ -388,11 +478,31 @@ fun DefectDetailScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text(
-                            text = currentDefect.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = currentDefect.description,
+                                onValueChange = { newDescription ->
+                                    currentDefect = currentDefect.copy(description = newDescription)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Enter defect description") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = { /* Handle done action */ }
+                                ),
+                                minLines = 3,
+                                maxLines = 6
+                            )
+                        } else {
+                            Text(
+                                text = currentDefect.description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -826,7 +936,7 @@ fun DefectDetailScreen(
                 }
             }
             
-            // Images (placeholder)
+            // Images section with photo functionality
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -836,13 +946,75 @@ fun DefectDetailScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Text(
-                            text = "Images",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Images",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            // Add photo button (only show when editing)
+                            if (isEditing) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Camera button
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (PermissionUtils.hasCameraPermission(context)) {
+                                                try {
+                                                    val imageFile = ImageUtils.createImageFile(context)
+                                                    val imageUri = ImageUtils.getImageUri(context, imageFile)
+                                                    cameraLauncher.launch(imageUri)
+                                                } catch (e: Exception) {
+                                                    // Handle error
+                                                }
+                                            } else {
+                                                permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                                            }
+                                        },
+                                        modifier = Modifier.size(40.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Take Photo",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    
+                                    // Gallery button
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (PermissionUtils.hasStoragePermission(context)) {
+                                                galleryLauncher.launch("image/*")
+                                            } else {
+                                                val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                    arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
+                                                } else {
+                                                    arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                                                }
+                                                permissionLauncher.launch(permissions)
+                                            }
+                                        },
+                                        modifier = Modifier.size(40.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Star,
+                                            contentDescription = "Select from Gallery",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
@@ -858,6 +1030,43 @@ fun DefectDetailScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Show image chips
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.horizontalScroll(rememberScrollState())
+                            ) {
+                                currentDefect.images.forEach { imagePath ->
+                                    AssistChip(
+                                        onClick = { },
+                                        label = { 
+                                            Text(
+                                                text = imagePath.substringAfterLast("/").take(15) + if (imagePath.length > 15) "..." else "",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            if (isEditing) {
+                                                IconButton(
+                                                    onClick = {
+                                                        val newImages = currentDefect.images.filter { it != imagePath }
+                                                        currentDefect = currentDefect.copy(images = newImages)
+                                                    },
+                                                    modifier = Modifier.size(16.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Remove",
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1188,13 +1397,64 @@ fun DefectDetailScreen(
         
         // Save/Cancel buttons when editing
         if (isEditing && hasChanges) {
-            com.example.movein.ui.screens.SaveCancelButtons(
+            SaveCancelButtons(
                 onSave = saveChanges,
                 onCancel = cancelChanges
             )
         }
+        
+        // Delete confirmation dialog
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { 
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete Defect")
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Are you sure you want to delete this defect?",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "This action cannot be undone.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            deleteDefect()
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
-
-
 
