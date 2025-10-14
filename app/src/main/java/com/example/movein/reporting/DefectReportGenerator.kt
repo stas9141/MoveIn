@@ -59,14 +59,14 @@ class DefectReportGenerator(private val context: Context) {
             
             val htmlContent = generateHtmlReport(filteredDefects, config)
             
+            // Create PDF using HtmlConverter
             val pdfWriter = PdfWriter(FileOutputStream(file))
-            val pdfDocument = PdfDocument(pdfWriter)
-            val document = Document(pdfDocument)
             
             try {
+                // Convert HTML to PDF
                 HtmlConverter.convertToPdf(htmlContent, pdfWriter)
             } finally {
-                document.close()
+                pdfWriter.close()
             }
             
             file

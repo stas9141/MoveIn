@@ -473,6 +473,11 @@ class AppState(
     
     fun deleteDefect(defectId: String) {
         defects = defects.filter { it.id != defectId }
+        // Clear selection if the deleted defect was selected to avoid stale UI state
+        if (selectedDefect?.id == defectId) {
+            selectedDefect = null
+        }
+        // Also ensure we navigate to the list if currently on detail (handled by caller)
         
         // Save to offline storage if available, otherwise fallback to local storage
         if (offlineStorage != null) {

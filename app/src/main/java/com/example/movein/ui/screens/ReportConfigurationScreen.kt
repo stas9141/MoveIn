@@ -317,9 +317,13 @@ fun ReportConfigurationScreen(
                                                     attachmentFile = reportFile
                                                 )
                                             )
+                                            
+                                            // Show success message
+                                            errorMessage = "Email sent successfully to ${company.name}!\n\nReport generated and email app opened."
+                                            showErrorDialog = true
                                         } catch (e: Exception) {
                                             // Handle email sending errors gracefully
-                                            errorMessage = "Failed to send email: ${e.message}"
+                                            errorMessage = "Failed to send email: ${e.message}\n\nPlease check:\n• Email app is installed\n• File permissions\n• Network connection"
                                             showErrorDialog = true
                                             e.printStackTrace()
                                         }
@@ -358,9 +362,13 @@ fun ReportConfigurationScreen(
                                         buildingCompanyName = selectedCompany?.name ?: "",
                                         buildingCompanyEmail = selectedCompany?.email ?: ""
                                     )
-                                    reportGenerator.generateDefectReport(defects, updatedConfig)
+                                    val reportFile = reportGenerator.generateDefectReport(defects, updatedConfig)
+                                    
+                                    // Show success message
+                                    errorMessage = "PDF report generated successfully!\nLocation: ${reportFile.absolutePath}"
+                                    showErrorDialog = true
                                 } catch (e: Exception) {
-                                    errorMessage = "Failed to generate PDF: ${e.message}"
+                                    errorMessage = "Failed to generate PDF: ${e.message}\n\nPlease check:\n• Storage permissions\n• Available disk space\n• PDF generation library"
                                     showErrorDialog = true
                                     e.printStackTrace()
                                 } finally {
@@ -434,11 +442,19 @@ fun ReportConfigurationScreen(
         )
     }
     
-    // Error Dialog
+    // Message Dialog (for both errors and success)
     if (showErrorDialog && errorMessage != null) {
         AlertDialog(
             onDismissRequest = { showErrorDialog = false },
-            title = { Text("Error") },
+            title = { 
+                Text(
+                    if (errorMessage!!.contains("successfully") || errorMessage!!.contains("success")) {
+                        "Success"
+                    } else {
+                        "Error"
+                    }
+                ) 
+            },
             text = { Text(errorMessage!!) },
             confirmButton = {
                 TextButton(onClick = { showErrorDialog = false }) {

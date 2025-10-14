@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-files-path name="my_images" path="Images/" />
-    <external-files-path name="reports" path="." />
-    <files-path name="internal_reports" path="." />
+    <external-files-path name="my_documents" path="Documents/" />
+    <external-files-path name="my_files" path="." />
+    <files-path name="internal_files" path="." />
+    <cache-path name="cache_files" path="." />
+    <external-cache-path name="external_cache" path="." />
 </paths>

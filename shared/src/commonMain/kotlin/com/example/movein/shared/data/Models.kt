@@ -68,6 +68,7 @@ data class Defect(
     val priority: Priority,
     val description: String,
     val images: List<String> = emptyList(),
+    val attachments: List<FileAttachment> = emptyList(),
     val status: DefectStatus = DefectStatus.OPEN,
     val createdAt: String,
     val dueDate: String? = null,

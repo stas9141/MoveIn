@@ -41,6 +41,9 @@ import com.example.movein.shared.data.DefectStatus
 import com.example.movein.shared.data.DefectCategory
 import com.example.movein.ui.components.PriorityDropdown
 import com.example.movein.ui.components.SaveCancelButtons
+import com.example.movein.ui.components.FileReviewDialog
+import com.example.movein.utils.FileReviewUtils
+import com.example.movein.shared.data.FileAttachment
 import com.example.movein.utils.formatCategory
 import com.example.movein.utils.getTodayString
 import com.example.movein.utils.getTomorrowString
@@ -53,6 +56,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.util.*
+
+private fun getFileExtension(uriString: String): String {
+    return try {
+        uriString.substringAfterLast('.', "file")
+    } catch (e: Exception) {
+        "file"
+    }
+}
 
 @Composable
 fun DefectCategoryDropdown(
@@ -125,26 +136,114 @@ fun DefectDetailScreen(
     var editingSubTaskId by remember { mutableStateOf<String?>(null) }
     var editingSubTaskText by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showFileReviewDialog by remember { mutableStateOf(false) }
+    var selectedAttachment by remember { mutableStateOf<FileAttachment?>(null) }
+    var showAttachmentDialog by remember { mutableStateOf(false) }
     
     // Photo functionality
     val context = LocalContext.current
+    var pendingCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
+        showAttachmentDialog = false
         if (success) {
-            val timestamp = System.currentTimeMillis()
-            val newImages = currentDefect.images + "Camera_${timestamp}.jpg"
-            currentDefect = currentDefect.copy(images = newImages)
+            pendingCameraUri?.let { uri ->
+                // Get the actual file size from the camera image
+                val fileSize = try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.available().toLong()
+                    } ?: 0L
+                } catch (e: Exception) {
+                    0L
+                }
+                
+                val newAttachment = FileAttachment(
+                    id = UUID.randomUUID().toString(),
+                    name = "Camera_${System.currentTimeMillis()}.jpg",
+                    type = "image/jpeg",
+                    uri = uri.toString(),
+                    size = fileSize
+                )
+                currentDefect = currentDefect.copy(attachments = currentDefect.attachments + newAttachment)
+                onDefectUpdate(currentDefect)
+            }
         }
+        pendingCameraUri = null
     }
     
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
+        showAttachmentDialog = false
         if (uri != null) {
-            val timestamp = System.currentTimeMillis()
-            val newImages = currentDefect.images + "Gallery_${timestamp}.jpg"
-            currentDefect = currentDefect.copy(images = newImages)
+            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(nameIndex)
+                } else {
+                    "Gallery_${System.currentTimeMillis()}.jpg"
+                }
+            } ?: "Gallery_${System.currentTimeMillis()}.jpg"
+            
+            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getLong(sizeIndex)
+                } else {
+                    0L
+                }
+            } ?: 0L
+            
+            val fileType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            
+            val newAttachment = FileAttachment(
+                id = UUID.randomUUID().toString(),
+                name = fileName,
+                type = fileType,
+                uri = uri.toString(),
+                size = fileSize
+            )
+            currentDefect = currentDefect.copy(attachments = currentDefect.attachments + newAttachment)
+            onDefectUpdate(currentDefect)
+        }
+    }
+    
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        showAttachmentDialog = false
+        if (uri != null) {
+            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(nameIndex)
+                } else {
+                    "File_${System.currentTimeMillis()}"
+                }
+            } ?: "File_${System.currentTimeMillis()}"
+            
+            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getLong(sizeIndex)
+                } else {
+                    0L
+                }
+            } ?: 0L
+            
+            val fileType = context.contentResolver.getType(uri) ?: "file"
+            
+            val newAttachment = FileAttachment(
+                id = UUID.randomUUID().toString(),
+                name = fileName,
+                type = fileType,
+                uri = uri.toString(),
+                size = fileSize
+            )
+            currentDefect = currentDefect.copy(attachments = currentDefect.attachments + newAttachment)
+            onDefectUpdate(currentDefect)
         }
     }
     
@@ -252,22 +351,22 @@ fun DefectDetailScreen(
             )
             
             // Action buttons
-            if (!isEditing) {
-                Row {
-                    // Duplicate button
+            Row {
+                if (!isEditing) {
+                    // Duplicate button (only when not editing)
                     IconButton(onClick = duplicateDefect) {
                         Icon(Icons.Default.Add, contentDescription = "Duplicate Defect")
                     }
                     
-                    // Edit button
+                    // Edit button (only when not editing)
                     IconButton(onClick = startEditing) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Defect")
                     }
-                    
-                    // Delete button
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Defect")
-                    }
+                }
+                
+                // Delete button (always available) - copied from TaskDetailScreen
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete Defect")
                 }
             }
         }
@@ -1003,7 +1102,7 @@ fun DefectDetailScreen(
                 }
             }
             
-            // Images section with photo functionality
+            // Attachments section (files)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -1013,166 +1112,44 @@ fun DefectDetailScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Text(
-                            text = "Images",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        
-                        // Add images button (only show when editing)
-                        if (isEditing) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Camera button
-                                OutlinedButton(
-                                    onClick = {
-                                        if (PermissionUtils.hasCameraPermission(context)) {
-                                            try {
-                                                val imageFile = ImageUtils.createImageFile(context)
-                                                val imageUri = ImageUtils.getImageUri(context, imageFile)
-                                                cameraLauncher.launch(imageUri)
-                                            } catch (e: Exception) {
-                                                // Handle error
-                                            }
-                                        } else {
-                                            permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(0.5f)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Add,
-                                        contentDescription = "Camera",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Camera")
-                                }
-                                
-                                // Gallery button
-                                OutlinedButton(
-                                    onClick = {
-                                        if (PermissionUtils.hasStoragePermission(context)) {
-                                            galleryLauncher.launch("image/*")
-                                        } else {
-                                            val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                                arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
-                                            } else {
-                                                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-                                            }
-                                            permissionLauncher.launch(permissions)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(0.5f)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        contentDescription = "Gallery",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Gallery")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Attachments",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                            if (isEditing) {
+                                IconButton(onClick = { showAttachmentDialog = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add Attachment")
                                 }
                             }
                         }
                         
-                        // Show images
-                        if (currentDefect.images.isNotEmpty()) {
+                        // Show attachments
+                        if (currentDefect.attachments.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${currentDefect.images.size} photo(s)",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                            currentDefect.attachments.forEach { attachment ->
+                                AttachmentItem(
+                                    attachment = attachment,
+                                    onDelete = {
+                                        val updatedAttachments = currentDefect.attachments.filter { it.id != attachment.id }
+                                        currentDefect = currentDefect.copy(attachments = updatedAttachments)
+                                        onDefectUpdate(currentDefect)
+                                    },
+                                    onReview = {
+                                        println("DEFECT: Attachment review clicked for: ${attachment.name}")
+                                        selectedAttachment = attachment
+                                        showFileReviewDialog = true
+                                        println("DEFECT: showFileReviewDialog set to: $showFileReviewDialog")
+                                    }
                                 )
-                                
-                                if (isEditing && currentDefect.images.isNotEmpty()) {
-                                    TextButton(
-                                        onClick = { /* TODO: Show clear all dialog */ }
-                                    ) {
-                                        Text("Clear all")
-                                    }
-                                }
                             }
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            // Show image thumbnails
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(currentDefect.images) { imagePath ->
-                                    Card(
-                                        modifier = Modifier.size(80.dp),
-                                        shape = MaterialTheme.shapes.medium
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            // Placeholder for image - in real implementation, load actual image
-                                            Surface(
-                                                modifier = Modifier.fillMaxSize(),
-                                                color = MaterialTheme.colorScheme.surfaceVariant
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Star,
-                                                        contentDescription = "Image",
-                                                        modifier = Modifier.size(32.dp),
-                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                            
-                                            // Remove button (only in edit mode)
-                                            if (isEditing) {
-                                                IconButton(
-                                                    onClick = {
-                                                        val newImages = currentDefect.images.filter { it != imagePath }
-                                                        currentDefect = currentDefect.copy(images = newImages)
-                                                    },
-                                                    modifier = Modifier
-                                                        .align(Alignment.TopEnd)
-                                                        .padding(4.dp)
-                                                        .size(24.dp)
-                                                ) {
-                                                    Surface(
-                                                        color = MaterialTheme.colorScheme.error,
-                                                        shape = CircleShape
-                                                    ) {
-                                                        Icon(
-                                                            Icons.Default.Close,
-                                                            contentDescription = "Remove",
-                                                            modifier = Modifier
-                                                                .padding(4.dp)
-                                                                .size(16.dp),
-                                                            tint = MaterialTheme.colorScheme.onError
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "No images attached",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
                         }
                     }
                 }
@@ -1206,6 +1183,14 @@ fun DefectDetailScreen(
                     }
                 }
             }
+        }
+        
+        // Save/Cancel buttons when editing
+        if (isEditing) {
+            SaveCancelButtons(
+                onSave = saveChanges,
+                onCancel = cancelChanges
+            )
         }
     }
     
@@ -1501,66 +1486,128 @@ fun DefectDetailScreen(
             }
         )
         
-        // Save/Cancel buttons when editing
-        if (isEditing) {
-            SaveCancelButtons(
-                onSave = saveChanges,
-                onCancel = cancelChanges
-            )
-        }
-        
-        // Delete confirmation dialog
-        if (showDeleteDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
-                title = { 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete Defect")
-                    }
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = "Are you sure you want to delete this defect?",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "This action cannot be undone.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            deleteDefect()
-                            showDeleteDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Delete")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel")
-                    }
+    }
+    
+    // Delete confirmation dialog - positioned outside main Column to avoid UI conflicts
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Defect")
                 }
-            )
-        }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Are you sure you want to delete this defect?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "This action cannot be undone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deleteDefect()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Attachment Dialog - positioned outside main Column to avoid UI conflicts
+    if (showAttachmentDialog) {
+        AttachmentDialog(
+            onDismiss = { showAttachmentDialog = false },
+            onAddImage = {
+                // Launch camera
+                if (PermissionUtils.hasCameraPermission(context)) {
+                    try {
+                        val imageFile = ImageUtils.createImageFile(context)
+                        val imageUri = ImageUtils.getImageUri(context, imageFile)
+                        pendingCameraUri = imageUri
+                        cameraLauncher.launch(imageUri)
+                    } catch (e: Exception) {
+                        // Handle error
+                    }
+                } else {
+                    permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                }
+            },
+            onAddFile = {
+                // Launch file picker
+                fileLauncher.launch("*/*")
+            },
+            onAddGallery = {
+                // Launch gallery
+                if (PermissionUtils.hasStoragePermission(context)) {
+                    galleryLauncher.launch("image/*")
+                } else {
+                    val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
+                    } else {
+                        arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                    }
+                    permissionLauncher.launch(permissions)
+                }
+            }
+        )
+    }
+    
+    // File Review Dialog - positioned outside main Column to avoid UI conflicts
+    if (showFileReviewDialog && selectedAttachment != null) {
+        println("DEFECT: Rendering FileReviewDialog for: ${selectedAttachment!!.name}")
+        FileReviewDialog(
+            attachment = selectedAttachment!!,
+            onDismiss = {
+                showFileReviewDialog = false
+                selectedAttachment = null
+            },
+            onDelete = {
+                // Delete from attachments if present, otherwise from images fallback
+                val att = selectedAttachment!!
+                val updatedAttachments = currentDefect.attachments.filter { it.id != att.id }
+                val updatedImages = currentDefect.images.filter { it != att.uri }
+                currentDefect = currentDefect.copy(
+                    attachments = updatedAttachments,
+                    images = updatedImages
+                )
+                onDefectUpdate(currentDefect)
+                showFileReviewDialog = false
+                selectedAttachment = null
+            },
+            onShare = {
+                FileReviewUtils.shareFile(context, selectedAttachment!!.uri, selectedAttachment!!.name)
+            },
+            onOpen = {
+                FileReviewUtils.openFileWithExternalApp(context, selectedAttachment!!.uri)
+            }
+        )
     }
 }
-

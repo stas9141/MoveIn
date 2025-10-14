@@ -218,6 +218,7 @@ actual class AppStorage(private val context: Context) {
             put("notes", defect.notes)
             put("assignedTo", defect.assignedTo ?: "")
             put("images", JSONArray(defect.images))
+            put("attachments", attachmentsToJsonArray(defect.attachments))
             put("subTasks", subTasksToJsonArray(defect.subTasks))
         }
     }
@@ -235,6 +236,18 @@ actual class AppStorage(private val context: Context) {
             images.add(imagesArray.getString(i))
         }
         
+        // Handle attachments with backward compatibility
+        val attachments = if (json.has("attachments")) {
+            val attachmentsArray = json.getJSONArray("attachments")
+            val attachmentsList = mutableListOf<FileAttachment>()
+            for (i in 0 until attachmentsArray.length()) {
+                attachmentsList.add(jsonToFileAttachment(attachmentsArray.getJSONObject(i)))
+            }
+            attachmentsList
+        } else {
+            emptyList()
+        }
+        
         return Defect(
             id = json.getString("id"),
             location = json.getString("location"),
@@ -247,6 +260,7 @@ actual class AppStorage(private val context: Context) {
             notes = json.getString("notes"),
             assignedTo = json.getString("assignedTo").takeIf { it.isNotEmpty() },
             images = images,
+            attachments = attachments,
             subTasks = subTasks
         )
     }

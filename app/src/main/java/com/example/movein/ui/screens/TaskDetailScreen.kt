@@ -61,6 +61,17 @@ import com.example.movein.utils.formatTaskStatus
 import com.example.movein.ui.components.EnhancedDatePicker
 import com.example.movein.ui.components.TaskStatusDropdown
 import com.example.movein.utils.CategoryUtils
+import com.example.movein.utils.PermissionUtils
+import com.example.movein.utils.ImageUtils
+import com.example.movein.utils.FileReviewUtils
+import com.example.movein.ui.components.FileReviewDialog
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import java.util.*
 
 @Composable
@@ -85,6 +96,93 @@ fun TaskDetailScreen(
     var editingSubTaskId by remember { mutableStateOf<String?>(null) }
     var editingSubTaskText by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showFileReviewDialog by remember { mutableStateOf(false) }
+    var selectedAttachment by remember { mutableStateOf<FileAttachment?>(null) }
+    
+    // Real attachment functionality
+    val context = LocalContext.current
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* handled inline */ }
+    
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        showAttachmentDialog = false
+        if (success) {
+            pendingCameraUri?.let { uri ->
+                // Get the actual file size from the camera image
+                val fileSize = try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.available().toLong()
+                    } ?: 0L
+                } catch (e: Exception) {
+                    0L
+                }
+                
+                val newAttachment = FileAttachment(
+                    id = UUID.randomUUID().toString(),
+                    name = "Camera_${System.currentTimeMillis()}.jpg",
+                    type = "image/jpeg",
+                    uri = uri.toString(),
+                    size = fileSize
+                )
+                currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
+                // Immediately save the task with the new attachment
+                onTaskUpdate(currentTask)
+            }
+        }
+        pendingCameraUri = null
+    }
+    
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        showAttachmentDialog = false
+        uris?.forEach { uri ->
+            if (uri != null) {
+                val newAttachment = FileAttachment(
+                    id = UUID.randomUUID().toString(),
+                    name = "Gallery_${System.currentTimeMillis()}.jpg",
+                    type = "image",
+                    uri = uri.toString(),
+                    size = 1024 * 1024 // 1MB
+                )
+                currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
+                // Immediately save the task with the new attachment
+                onTaskUpdate(currentTask)
+            }
+        }
+    }
+    
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        showAttachmentDialog = false
+        uris?.forEach { uri ->
+            if (uri != null) {
+                val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0 && cursor.moveToFirst()) {
+                        cursor.getString(nameIndex)
+                    } else null
+                } ?: "Document_${System.currentTimeMillis()}.pdf"
+                
+                val newAttachment = FileAttachment(
+                    id = UUID.randomUUID().toString(),
+                    name = fileName,
+                    type = "file",
+                    uri = uri.toString(),
+                    size = 2048 * 1024 // 2MB
+                )
+                currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
+                // Immediately save the task with the new attachment
+                onTaskUpdate(currentTask)
+            }
+        }
+    }
     
     // Helper functions for sub-task editing
     val startEditingSubTask = { subTaskId: String, currentText: String ->
@@ -554,6 +652,12 @@ fun TaskDetailScreen(
                                     onDelete = {
                                         val updatedAttachments = currentTask.attachments.filter { it.id != attachment.id }
                                         currentTask = currentTask.copy(attachments = updatedAttachments)
+                                        // Immediately save the task with the updated attachments
+                                        onTaskUpdate(currentTask)
+                                    },
+                                    onReview = {
+                                        selectedAttachment = attachment
+                                        showFileReviewDialog = true
                                     }
                                 )
                             }
@@ -765,28 +869,61 @@ fun TaskDetailScreen(
             AttachmentDialog(
                 onDismiss = { showAttachmentDialog = false },
                 onAddImage = {
-                    // Simulate adding an image attachment
-                    val newAttachment = FileAttachment(
-                        id = UUID.randomUUID().toString(),
-                        name = "Image_${System.currentTimeMillis()}.jpg",
-                        type = "image",
-                        uri = "content://image/${System.currentTimeMillis()}",
-                        size = 1024 * 1024 // 1MB
-                    )
-                    currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
-                    showAttachmentDialog = false
+                    // Launch camera
+                    if (PermissionUtils.hasCameraPermission(context)) {
+                        try {
+                            val imageFile = ImageUtils.createImageFile(context)
+                            val imageUri = ImageUtils.getImageUri(context, imageFile)
+                            pendingCameraUri = imageUri
+                            cameraLauncher.launch(imageUri)
+                        } catch (e: Exception) {
+                            // Handle error
+                            showAttachmentDialog = false
+                        }
+                    } else {
+                        permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                    }
                 },
                 onAddFile = {
-                    // Simulate adding a file attachment
-                    val newAttachment = FileAttachment(
-                        id = UUID.randomUUID().toString(),
-                        name = "Document_${System.currentTimeMillis()}.pdf",
-                        type = "file",
-                        uri = "content://file/${System.currentTimeMillis()}",
-                        size = 2048 * 1024 // 2MB
-                    )
-                    currentTask = currentTask.copy(attachments = currentTask.attachments + newAttachment)
-                    showAttachmentDialog = false
+                    // Launch file picker
+                    fileLauncher.launch("*/*")
+                },
+                onAddGallery = {
+                    // Launch gallery
+                    if (PermissionUtils.hasStoragePermission(context)) {
+                        galleryLauncher.launch("image/*")
+                    } else {
+                        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+                        } else {
+                            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        }
+                        permissionLauncher.launch(permissions)
+                    }
+                }
+            )
+        }
+        
+        // File Review Dialog
+        if (showFileReviewDialog && selectedAttachment != null) {
+            FileReviewDialog(
+                attachment = selectedAttachment!!,
+                onDismiss = {
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onDelete = {
+                    val updatedAttachments = currentTask.attachments.filter { it.id != selectedAttachment!!.id }
+                    currentTask = currentTask.copy(attachments = updatedAttachments)
+                    onTaskUpdate(currentTask)
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onShare = {
+                    FileReviewUtils.shareFile(context, selectedAttachment!!.uri, selectedAttachment!!.name)
+                },
+                onOpen = {
+                    FileReviewUtils.openFileWithExternalApp(context, selectedAttachment!!.uri)
                 }
             )
         }
@@ -796,7 +933,8 @@ fun TaskDetailScreen(
 @Composable
 fun AttachmentItem(
     attachment: FileAttachment,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onReview: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -818,7 +956,9 @@ fun AttachmentItem(
             )
             
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onReview() }
             ) {
                 Text(
                     text = attachment.name,
@@ -826,14 +966,19 @@ fun AttachmentItem(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "${attachment.size / 1024} KB",
+                    text = FileReviewUtils.formatFileSize(attachment.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete")
+            Row {
+                IconButton(onClick = onReview) {
+                    Icon(Icons.Default.Info, contentDescription = "Review")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                }
             }
         }
         
@@ -845,7 +990,8 @@ fun AttachmentItem(
 fun AttachmentDialog(
     onDismiss: () -> Unit,
     onAddImage: () -> Unit,
-    onAddFile: () -> Unit
+    onAddFile: () -> Unit,
+    onAddGallery: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -858,6 +1004,7 @@ fun AttachmentDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
+                // Camera button
                 Button(
                     onClick = onAddImage,
                     modifier = Modifier.fillMaxWidth(),
@@ -870,13 +1017,13 @@ fun AttachmentDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            Icons.Default.Star, 
+                            Icons.Default.Add, 
                             contentDescription = null, 
                             modifier = Modifier.padding(end = 8.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            "Add Image",
+                            "Take Photo",
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -884,8 +1031,9 @@ fun AttachmentDialog(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
+                // Gallery button
                 Button(
-                    onClick = onAddFile,
+                    onClick = onAddGallery,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -896,14 +1044,41 @@ fun AttachmentDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            Icons.Default.Info, 
+                            Icons.Default.Star, 
                             contentDescription = null, 
                             modifier = Modifier.padding(end = 8.dp),
                             tint = MaterialTheme.colorScheme.secondary
                         )
                         Text(
-                            "Add File",
+                            "Choose from Gallery",
                             color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // File button
+                Button(
+                    onClick = onAddFile,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Info, 
+                            contentDescription = null, 
+                            modifier = Modifier.padding(end = 8.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            "Add File",
+                            color = MaterialTheme.colorScheme.tertiary
                         )
                     }
                 }

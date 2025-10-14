@@ -1,6 +1,7 @@
 package com.example.movein.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 // RoundedCornerShape already imported above; removing duplicate import to avoid ambiguity
@@ -53,7 +54,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.movein.ui.components.EnhancedDatePicker
-import com.example.movein.ui.components.ImageAttachButton
+import com.example.movein.ui.components.FileReviewDialog
+import com.example.movein.utils.FileReviewUtils
+import com.example.movein.shared.data.FileAttachment
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -62,6 +65,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private fun getFileExtension(uriString: String): String {
+    return try {
+        uriString.substringAfterLast('.', "file")
+    } catch (e: Exception) {
+        "file"
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,8 +95,11 @@ fun AddEditDefectScreen(
     var locationError by remember { mutableStateOf<String?>(null) }
     var descriptionError by remember { mutableStateOf<String?>(null) }
 
-    var selectedImages by remember { mutableStateOf(defect?.images ?: emptyList<String>()) }
+    var selectedAttachments by remember { mutableStateOf(defect?.attachments ?: emptyList<FileAttachment>()) }
     var isSaving by remember { mutableStateOf(false) }
+    var showFileReviewDialog by remember { mutableStateOf(false) }
+    var selectedAttachment by remember { mutableStateOf<FileAttachment?>(null) }
+    var showAttachmentDialog by remember { mutableStateOf(false) }
     
     val isEditing = defect != null
     
@@ -94,6 +107,67 @@ fun AddEditDefectScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
+    
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val timestamp = System.currentTimeMillis()
+            val fileName = "Camera_${timestamp}.jpg"
+            val newAttachment = FileAttachment(
+                id = UUID.randomUUID().toString(),
+                name = fileName,
+                type = "image",
+                uri = "camera://${timestamp}.jpg", // Placeholder URI
+                size = 0L
+            )
+            selectedAttachments = selectedAttachments + newAttachment
+        }
+    }
+    
+    // Gallery launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val timestamp = System.currentTimeMillis()
+            val fileName = "Gallery_${timestamp}.jpg"
+            val newAttachment = FileAttachment(
+                id = UUID.randomUUID().toString(),
+                name = fileName,
+                type = "image",
+                uri = uri.toString(),
+                size = 0L
+            )
+            selectedAttachments = selectedAttachments + newAttachment
+        }
+    }
+    
+    // File launcher for attachments
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val timestamp = System.currentTimeMillis()
+            val fileName = "File_${timestamp}.${getFileExtension(uri.toString())}"
+            val newAttachment = FileAttachment(
+                id = UUID.randomUUID().toString(),
+                name = fileName,
+                type = "file",
+                uri = uri.toString(),
+                size = 0L // We don't have access to file size here
+            )
+            selectedAttachments = selectedAttachments + newAttachment
+        }
+    }
+    
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Handle permission results
+    }
     
     
     // Generate location options based on user data
@@ -265,7 +339,8 @@ fun AddEditDefectScreen(
                                     category = selectedCategory,
                                     priority = selectedPriority,
                                     description = description.trim(),
-                                    images = selectedImages,
+                                    images = emptyList(), // Images are now handled as attachments
+                                    attachments = selectedAttachments,
                                     status = defect?.status ?: DefectStatus.OPEN,
                                     createdAt = defect?.createdAt ?: getTodayString(),
                                     dueDate = selectedDueDate,
@@ -506,194 +581,143 @@ fun AddEditDefectScreen(
                 )
             }
             
-            // Image upload section
+            // Attachments section (files) - moved to be with other form fields
             Column {
-                Text(
-                    text = "Images",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Column {
+                        Text(
+                            text = "Attachments",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                        if (selectedAttachments.isNotEmpty()) {
+                            Text(
+                                text = "${selectedAttachments.size} file${if (selectedAttachments.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                if (selectedAttachments.isEmpty()) {
+                    // Compact empty state
+                    OutlinedButton(
+                        onClick = { showAttachmentDialog = true },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Images",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(48.dp)
+                            Icons.Default.Add,
+                            contentDescription = "Add Attachments",
+                            modifier = Modifier.size(18.dp)
                         )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Text(
-                            text = "Add photos of the defect",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // Attach Button
-                        ImageAttachButton(
-                            onImageSelected = { imagePath ->
-                                selectedImages = selectedImages + imagePath
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            currentCount = selectedImages.size
-                        )
-                        
-                        // Show selected images if any
-                        if (selectedImages.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            var previewUri by remember { mutableStateOf<String?>(null) }
-                            var showClearAllDialog by remember { mutableStateOf(false) }
-
-                            // Header with count
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "${selectedImages.size} photo(s)",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Tap to preview • Tap × to remove",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                TextButton(onClick = { showClearAllDialog = true }) {
-                                    Text("Clear all")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Add Attachments")
+                    }
+                } else {
+                    // Compact attachments list
+                    Column {
+                        selectedAttachments.forEach { attachment ->
+                            AttachmentItem(
+                                attachment = attachment,
+                                onDelete = {
+                                    selectedAttachments = selectedAttachments.filter { it.id != attachment.id }
+                                },
+                                onReview = {
+                                    selectedAttachment = attachment
+                                    showFileReviewDialog = true
                                 }
+                            )
+                            
+                            if (attachment != selectedAttachments.last()) {
+                                Spacer(modifier = Modifier.height(4.dp))
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Thumbnails row
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                items(selectedImages) { imagePath ->
-                                    val context = LocalContext.current
-                                    var bitmapState by remember(imagePath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-
-                                    LaunchedEffect(imagePath) {
-                                        bitmapState = withContext(Dispatchers.IO) {
-                                            try {
-                                                val uri = Uri.parse(imagePath)
-                                                context.contentResolver.openInputStream(uri)?.use { input ->
-                                                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = false; inSampleSize = 4 }
-                                                    BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
-                                                }
-                                            } catch (_: Exception) { null }
-                                        }
-                                    }
-
-                                    Card(
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(96.dp)
-                                                .clickable { previewUri = imagePath },
-                                            contentAlignment = Alignment.TopEnd
-                                        ) {
-                                            if (bitmapState != null) {
-                                                Image(
-                                                    bitmap = bitmapState!!,
-                                                    contentDescription = "Photo",
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                                }
-                                            }
-
-                                            IconButton(
-                                                onClick = { selectedImages = selectedImages.filter { it != imagePath } },
-                                                modifier = Modifier
-                                                    .padding(4.dp)
-                                                    .size(24.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    contentDescription = "Remove photo",
-                                                    tint = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Preview dialog
-                            if (previewUri != null) {
-                                AlertDialog(
-                                    onDismissRequest = { previewUri = null },
-                                    text = {
-                                        val context = LocalContext.current
-                                        var fullBitmap by remember(previewUri) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-                                        LaunchedEffect(previewUri) {
-                                            fullBitmap = withContext(Dispatchers.IO) {
-                                                try {
-                                                    val uri = Uri.parse(previewUri)
-                                                    context.contentResolver.openInputStream(uri)?.use { input ->
-                                                        BitmapFactory.decodeStream(input)?.asImageBitmap()
-                                                    }
-                                                } catch (_: Exception) { null }
-                                            }
-                                        }
-                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                            if (fullBitmap != null) {
-                                                Image(bitmap = fullBitmap!!, contentDescription = "Preview")
-                                            } else {
-                                                CircularProgressIndicator()
-                                            }
-                                        }
-                                    },
-                                    confirmButton = {
-                                        TextButton(onClick = { previewUri = null }) { Text("Close") }
-                                    }
-                                )
-                            }
-
-                            // Clear all confirmation dialog
-                            if (showClearAllDialog) {
-                                AlertDialog(
-                                    onDismissRequest = { showClearAllDialog = false },
-                                    title = { Text("Remove all images?") },
-                                    text = { Text("This will remove all attached images from this defect.") },
-                                    confirmButton = {
-                                        TextButton(onClick = {
-                                            selectedImages = emptyList()
-                                            showClearAllDialog = false
-                                        }) { Text("Remove") }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { showClearAllDialog = false }) { Text("Cancel") }
-                                    }
-                                )
-                            }
+                        }
+                        
+                        // Compact Add More button
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { showAttachmentDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Add More Files",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add More Files")
                         }
                     }
                 }
             }
+        }
+        
+        // Attachment Dialog
+        if (showAttachmentDialog) {
+            AttachmentDialog(
+                onDismiss = { showAttachmentDialog = false },
+                onAddImage = {
+                    // Launch camera
+                    if (PermissionUtils.hasCameraPermission(context)) {
+                        try {
+                            val imageFile = ImageUtils.createImageFile(context)
+                            val imageUri = ImageUtils.getImageUri(context, imageFile)
+                            cameraLauncher.launch(imageUri)
+                        } catch (e: Exception) {
+                            // Handle error
+                        }
+                    } else {
+                        permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                    }
+                },
+                onAddFile = {
+                    // Launch file picker
+                    fileLauncher.launch("*/*")
+                },
+                onAddGallery = {
+                    // Launch gallery
+                    if (PermissionUtils.hasStoragePermission(context)) {
+                        galleryLauncher.launch("image/*")
+                    } else {
+                        val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
+                        } else {
+                            arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                        }
+                        permissionLauncher.launch(permissions)
+                    }
+                }
+            )
+        }
+        
+        // File Review Dialog
+        if (showFileReviewDialog && selectedAttachment != null) {
+            FileReviewDialog(
+                attachment = selectedAttachment!!,
+                onDismiss = {
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onDelete = {
+                    selectedAttachments = selectedAttachments.filter { it.id != selectedAttachment!!.id }
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onShare = {
+                    FileReviewUtils.shareFile(context, selectedAttachment!!.uri, selectedAttachment!!.name)
+                },
+                onOpen = {
+                    FileReviewUtils.openFileWithExternalApp(context, selectedAttachment!!.uri)
+                }
+            )
         }
         
         
@@ -784,8 +808,28 @@ fun AddEditDefectScreen(
                 title = "Select Due Date"
             )
         }
+        
+        // File Review Dialog
+        if (showFileReviewDialog && selectedAttachment != null) {
+            FileReviewDialog(
+                attachment = selectedAttachment!!,
+                onDismiss = {
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onDelete = {
+                    selectedAttachments = selectedAttachments.filter { it.id != selectedAttachment!!.id }
+                    showFileReviewDialog = false
+                    selectedAttachment = null
+                },
+                onShare = {
+                    FileReviewUtils.shareFile(context, selectedAttachment!!.uri, selectedAttachment!!.name)
+                },
+                onOpen = {
+                    FileReviewUtils.openFileWithExternalApp(context, selectedAttachment!!.uri)
+                }
+            )
+        }
             }
         }
     }
-
-
