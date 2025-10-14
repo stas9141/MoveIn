@@ -858,6 +858,7 @@ fun TaskDetailScreen(
                 selectedDate = currentTask.dueDate,
                 onDateSelected = { date ->
                     currentTask = currentTask.copy(dueDate = date)
+                    showDueDateDialog = false // Automatically close the dialog when a date is selected
                 },
                 onDismiss = { showDueDateDialog = false },
                 title = "Set Due Date"

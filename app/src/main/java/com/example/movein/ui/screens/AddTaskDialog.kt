@@ -414,6 +414,7 @@ fun AddTaskDialog(
             selectedDate = selectedDueDate,
             onDateSelected = { date ->
                 selectedDueDate = date
+                showDueDateDialog = false // Automatically close the dialog when a date is selected
             },
             onDismiss = { showDueDateDialog = false },
             title = "Set Due Date"

@@ -789,7 +789,8 @@ fun MoveInApp() {
                     },
                     onAddTask = { newTask ->
                         appState.addTask(newTask)
-                        // Stay on Calendar/Dashboard context
+                        // Navigate to Dashboard to show the newly added task on the relevant tab
+                        appState.navigateTo(Screen.Dashboard)
                     },
                     onAddDefect = { newDefect ->
                         appState.clearSelectedDefect()

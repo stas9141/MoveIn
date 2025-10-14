@@ -1374,6 +1374,7 @@ fun DefectDetailScreen(
             selectedDate = currentDefect.dueDate,
             onDateSelected = { date ->
                 currentDefect = currentDefect.copy(dueDate = date)
+                showDueDateDialog = false // Automatically close the dialog when a date is selected
             },
             onDismiss = { showDueDateDialog = false },
             title = "Set Due Date"
