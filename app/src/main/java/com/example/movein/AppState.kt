@@ -209,9 +209,9 @@ class AppState(
                     defects = appStorage?.loadDefects() ?: emptyList()
                 }
             } else {
-                // For anonymous users, start with empty defects list
-                // This ensures new users don't see previous test data
-                defects = emptyList()
+                // For anonymous users, load from local storage
+                // This preserves defects for anonymous users across app restarts
+                defects = appStorage?.loadDefects() ?: emptyList()
             }
         } catch (e: Exception) {
             // On error, start with empty list for new users
@@ -235,9 +235,13 @@ class AppState(
                     checklistData = appStorage?.loadChecklistData()
                 }
             } else {
-                // For anonymous users, generate fresh checklist based on user data
-                // This ensures new users don't see previous test data
-                if (userData != null) {
+                // For anonymous users, try to load saved tasks first
+                val savedChecklistData = appStorage?.loadChecklistData()
+                if (savedChecklistData != null) {
+                    // Load saved tasks to preserve user progress
+                    checklistData = savedChecklistData
+                } else if (userData != null) {
+                    // If no saved data, generate fresh checklist based on user data
                     checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(userData!!)
                 } else {
                     // If no user data, start with null (will be generated when user data is set)
@@ -811,7 +815,12 @@ class AppState(
     }
     
     fun addTask(newTask: ChecklistItem) {
-        val currentData = checklistData ?: return
+        // If no checklist data exists, create a new one
+        val currentData = checklistData ?: ChecklistData(
+            firstWeek = emptyList(),
+            firstMonth = emptyList(),
+            firstYear = emptyList()
+        )
         
         // Determine which host to add the task to based on due date
         val targetHost = getTaskHost(newTask)

@@ -77,3 +77,14 @@ data class Defect(
     val notes: String = "",
     val assignedTo: String? = null
 )
+
+data class BuildingCompany(
+    val id: String,
+    val name: String,
+    val email: String,
+    val phone: String = "",
+    val address: String = "",
+    val contactPerson: String = "",
+    val notes: String = "",
+    val isDefault: Boolean = false
+)

@@ -43,4 +43,30 @@ actual class AppStorage {
         // For now, return empty list - iOS implementation would need proper deserialization
         return emptyList()
     }
+    
+    actual fun saveBuildingCompanies(companies: List<com.example.movein.shared.data.BuildingCompany>) {
+        // For now, do nothing - iOS implementation would need proper serialization
+        userDefaults.synchronize()
+    }
+    
+    actual fun loadBuildingCompanies(): List<com.example.movein.shared.data.BuildingCompany> {
+        // For now, return empty list - iOS implementation would need proper deserialization
+        return emptyList()
+    }
+    
+    actual fun clearAllData() {
+        // Clear all user defaults
+        userDefaults.removeObjectForKey("user_data")
+        userDefaults.removeObjectForKey("checklist_data")
+        userDefaults.removeObjectForKey("defects")
+        userDefaults.removeObjectForKey("building_companies")
+        userDefaults.synchronize()
+    }
+    
+    actual fun clearUserData() {
+        // Clear only user-specific data
+        userDefaults.removeObjectForKey("user_data")
+        userDefaults.removeObjectForKey("defects")
+        userDefaults.synchronize()
+    }
 }

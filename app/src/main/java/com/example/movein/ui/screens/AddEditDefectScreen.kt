@@ -109,21 +109,33 @@ fun AddEditDefectScreen(
     val scope = rememberCoroutineScope()
     
     // Camera launcher
+    var pendingCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success) {
-            val timestamp = System.currentTimeMillis()
-            val fileName = "Camera_${timestamp}.jpg"
-            val newAttachment = FileAttachment(
-                id = UUID.randomUUID().toString(),
-                name = fileName,
-                type = "image",
-                uri = "camera://${timestamp}.jpg", // Placeholder URI
-                size = 0L
-            )
-            selectedAttachments = selectedAttachments + newAttachment
+            pendingCameraUri?.let { uri ->
+                // Get the actual file size from the camera image
+                val fileSize = try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.available().toLong()
+                    } ?: 0L
+                } catch (e: Exception) {
+                    0L
+                }
+                
+                val newAttachment = FileAttachment(
+                    id = UUID.randomUUID().toString(),
+                    name = "Camera_${System.currentTimeMillis()}.jpg",
+                    type = "image/jpeg",
+                    uri = uri.toString(),
+                    size = fileSize
+                )
+                selectedAttachments = selectedAttachments + newAttachment
+            }
         }
+        pendingCameraUri = null
     }
     
     // Gallery launcher
@@ -670,6 +682,7 @@ fun AddEditDefectScreen(
                         try {
                             val imageFile = ImageUtils.createImageFile(context)
                             val imageUri = ImageUtils.getImageUri(context, imageFile)
+                            pendingCameraUri = imageUri
                             cameraLauncher.launch(imageUri)
                         } catch (e: Exception) {
                             // Handle error

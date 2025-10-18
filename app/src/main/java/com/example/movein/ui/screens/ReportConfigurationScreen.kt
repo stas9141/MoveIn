@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.movein.reporting.BuildingCompany
+import com.example.movein.shared.data.BuildingCompany
 import com.example.movein.reporting.BuildingCompanyManager
 import com.example.movein.reporting.DefectReportGenerator
 import com.example.movein.reporting.EmailService
@@ -46,7 +47,7 @@ fun ReportConfigurationScreen(
     }
     var isGeneratingReport by remember { mutableStateOf(false) }
     var showCompanyDialog by remember { mutableStateOf(false) }
-    var newCompany by remember { mutableStateOf(BuildingCompany(name = "", email = "")) }
+    var newCompany by remember { mutableStateOf(BuildingCompany(id = java.util.UUID.randomUUID().toString(), name = "", email = "")) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showErrorDialog by remember { mutableStateOf(false) }
     
@@ -362,13 +363,17 @@ fun ReportConfigurationScreen(
                                         buildingCompanyName = selectedCompany?.name ?: "",
                                         buildingCompanyEmail = selectedCompany?.email ?: ""
                                     )
-                                    val reportFile = reportGenerator.generateDefectReport(defects, updatedConfig)
+                                    val pdfData = reportGenerator.generatePdfReportForSharing(defects, updatedConfig)
+                                    
+                                    // Create share intent and launch it
+                                    val shareIntent = reportGenerator.createShareIntent(pdfData)
+                                    context.startActivity(shareIntent)
                                     
                                     // Show success message
-                                    errorMessage = "PDF report generated successfully!\nLocation: ${reportFile.absolutePath}"
+                                    errorMessage = "PDF report generated successfully!\n\nShare dialog opened - you can now send it via email, messaging apps, or save to cloud storage."
                                     showErrorDialog = true
                                 } catch (e: Exception) {
-                                    errorMessage = "Failed to generate PDF: ${e.message}\n\nPlease check:\n• Storage permissions\n• Available disk space\n• PDF generation library"
+                                    errorMessage = "Failed to generate PDF: ${e.message}\n\nPlease check:\n• PDF generation library\n• Available memory\n• File permissions"
                                     showErrorDialog = true
                                     e.printStackTrace()
                                 } finally {
@@ -379,9 +384,9 @@ fun ReportConfigurationScreen(
                         enabled = !isGeneratingReport,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null)
+                        Icon(Icons.Default.Share, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generate PDF Only")
+                        Text("Generate & Share PDF")
                     }
                 }
             }
@@ -428,7 +433,7 @@ fun ReportConfigurationScreen(
                     onClick = {
                         buildingCompanyManager.addCompany(newCompany)
                         showCompanyDialog = false
-                        newCompany = BuildingCompany(name = "", email = "")
+                        newCompany = BuildingCompany(id = java.util.UUID.randomUUID().toString(), name = "", email = "")
                     }
                 ) {
                     Text("Add")

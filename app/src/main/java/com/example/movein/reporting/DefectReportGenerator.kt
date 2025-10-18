@@ -1,8 +1,11 @@
 package com.example.movein.reporting
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.core.content.FileProvider
 import com.example.movein.shared.data.Defect
 import com.example.movein.shared.data.Priority
 import com.example.movein.shared.data.DefectStatus
@@ -18,9 +21,10 @@ import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
 import com.itextpdf.io.image.ImageDataFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import android.util.Base64
+import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
@@ -74,6 +78,70 @@ class DefectReportGenerator(private val context: Context) {
             e.printStackTrace()
             throw e
         }
+    }
+    
+    /**
+     * Generate PDF report in memory and return as ByteArray for sharing
+     */
+    suspend fun generatePdfReportForSharing(
+        defects: List<Defect>,
+        config: ReportConfig = ReportConfig()
+    ): ByteArray = withContext(Dispatchers.IO) {
+        try {
+            val filteredDefects = if (config.includeClosedDefects) {
+                defects
+            } else {
+                defects.filter { it.status != DefectStatus.CLOSED }
+            }
+            
+            val htmlContent = generateHtmlReport(filteredDefects, config)
+            
+            // Create PDF in memory using ByteArrayOutputStream
+            val outputStream = ByteArrayOutputStream()
+            val pdfWriter = PdfWriter(outputStream)
+            
+            try {
+                // Convert HTML to PDF
+                HtmlConverter.convertToPdf(htmlContent, pdfWriter)
+            } finally {
+                pdfWriter.close()
+            }
+            
+            outputStream.toByteArray()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+    
+    /**
+     * Create a share intent for the PDF report
+     */
+    fun createShareIntent(
+        pdfData: ByteArray,
+        fileName: String = "defect_report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf"
+    ): Intent {
+        // Create a temporary file for sharing
+        val tempFile = File(context.cacheDir, fileName)
+        tempFile.writeBytes(pdfData)
+        
+        // Create URI using FileProvider
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            tempFile
+        )
+        
+        // Create share intent
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Defect Report")
+            putExtra(Intent.EXTRA_TEXT, "Please find attached the defect report.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        return Intent.createChooser(shareIntent, "Share Defect Report")
     }
     
     private fun generateHtmlReport(defects: List<Defect>, config: ReportConfig): String {
@@ -264,12 +332,37 @@ class DefectReportGenerator(private val context: Context) {
             DefectStatus.CLOSED -> "status-closed"
         }
         
-        val imagesHtml = if (config.includeImages && defect.images.isNotEmpty()) {
-            defect.images.take(3).joinToString("") { imagePath ->
-                """
-                <img src="file://$imagePath" class="defect-image" alt="Defect Image" />
-                """.trimIndent()
-            }
+        val imagesHtml = if (config.includeImages) {
+            val allImages = mutableListOf<String>()
+            
+            // Add images from defect.images
+            allImages.addAll(defect.images)
+            
+            // Add images from defect.attachments
+            val attachmentImages = defect.attachments.filter { it.type == "image" }.map { it.uri }
+            allImages.addAll(attachmentImages)
+            
+            if (allImages.isNotEmpty()) {
+                allImages.take(3).joinToString("") { imagePath ->
+                    try {
+                        // Try to convert image to base64 for PDF embedding
+                        val base64Image = convertImageToBase64(imagePath)
+                        if (base64Image != null) {
+                            """
+                            <img src="data:image/jpeg;base64,$base64Image" class="defect-image" alt="Defect Image" />
+                            """.trimIndent()
+                        } else {
+                            """
+                            <div class="defect-image-placeholder">Image: ${imagePath.substringAfterLast("/")}</div>
+                            """.trimIndent()
+                        }
+                    } catch (e: Exception) {
+                        """
+                        <div class="defect-image-placeholder">Image: ${imagePath.substringAfterLast("/")}</div>
+                        """.trimIndent()
+                    }
+                }
+            } else ""
         } else ""
         
         return """
@@ -303,6 +396,22 @@ class DefectReportGenerator(private val context: Context) {
             </div>
             """ else ""}
             
+            ${if (defect.notes.isNotEmpty()) """
+            <div class="defect-description">
+                <strong>Notes:</strong><br>
+                ${defect.notes.replace("\n", "<br>")}
+            </div>
+            """ else ""}
+            
+            ${if (defect.attachments.isNotEmpty()) """
+            <div class="defect-description">
+                <strong>Attachments:</strong><br>
+                ${defect.attachments.joinToString("<br>") { attachment ->
+                    "${attachment.name} (${attachment.type})"
+                }}
+            </div>
+            """ else ""}
+            
             $imagesHtml
         </div>
         """.trimIndent()
@@ -321,4 +430,54 @@ class DefectReportGenerator(private val context: Context) {
             DefectStatus.IN_PROGRESS -> "In Progress"
             DefectStatus.CLOSED -> "Closed"
         }
+    
+    private fun convertImageToBase64(imagePath: String): String? {
+        return try {
+            val bitmap = if (imagePath.startsWith("content://")) {
+                // Handle content URI (from gallery/camera)
+                val uri = Uri.parse(imagePath)
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    BitmapFactory.decodeStream(inputStream)
+                }
+            } else if (imagePath.startsWith("file://")) {
+                // Handle file URI
+                val file = File(imagePath.substring(7)) // Remove "file://" prefix
+                if (!file.exists()) {
+                    return null
+                }
+                BitmapFactory.decodeFile(file.absolutePath)
+            } else {
+                // Handle direct file path
+                val file = File(imagePath)
+                if (!file.exists()) {
+                    return null
+                }
+                BitmapFactory.decodeFile(imagePath)
+            }
+            
+            if (bitmap == null) {
+                return null
+            }
+            
+            // Resize bitmap to reduce size for PDF
+            val maxWidth = 400
+            val maxHeight = 300
+            val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
+                val scale = minOf(maxWidth.toFloat() / bitmap.width, maxHeight.toFloat() / bitmap.height)
+                val newWidth = (bitmap.width * scale).toInt()
+                val newHeight = (bitmap.height * scale).toInt()
+                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            } else {
+                bitmap
+            }
+            
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val byteArray = outputStream.toByteArray()
+            
+            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

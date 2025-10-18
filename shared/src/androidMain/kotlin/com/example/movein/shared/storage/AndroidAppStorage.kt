@@ -12,6 +12,7 @@ import com.example.movein.shared.data.Priority
 import com.example.movein.shared.data.TaskStatus
 import com.example.movein.shared.data.DefectStatus
 import com.example.movein.shared.data.DefectCategory
+import com.example.movein.shared.data.BuildingCompany
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -275,5 +276,46 @@ actual class AppStorage(private val context: Context) {
             .remove("user_data")
             .remove("defects")
             .apply()
+    }
+    
+    actual fun saveBuildingCompanies(companies: List<BuildingCompany>) {
+        val jsonArray = JSONArray()
+        companies.forEach { company ->
+            jsonArray.put(JSONObject().apply {
+                put("id", company.id)
+                put("name", company.name)
+                put("email", company.email)
+                put("phone", company.phone)
+                put("address", company.address)
+                put("contactPerson", company.contactPerson)
+                put("notes", company.notes)
+                put("isDefault", company.isDefault)
+            })
+        }
+        prefs.edit().putString("building_companies", jsonArray.toString()).apply()
+    }
+    
+    actual fun loadBuildingCompanies(): List<BuildingCompany> {
+        val jsonString = prefs.getString("building_companies", null) ?: return emptyList()
+        return try {
+            val jsonArray = JSONArray(jsonString)
+            val companies = mutableListOf<BuildingCompany>()
+            for (i in 0 until jsonArray.length()) {
+                val json = jsonArray.getJSONObject(i)
+                companies.add(BuildingCompany(
+                    id = json.getString("id"),
+                    name = json.getString("name"),
+                    email = json.getString("email"),
+                    phone = json.optString("phone", ""),
+                    address = json.optString("address", ""),
+                    contactPerson = json.optString("contactPerson", ""),
+                    notes = json.optString("notes", ""),
+                    isDefault = json.optBoolean("isDefault", false)
+                ))
+            }
+            companies
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 }
