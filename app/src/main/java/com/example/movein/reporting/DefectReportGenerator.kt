@@ -339,24 +339,33 @@ class DefectReportGenerator(private val context: Context) {
             allImages.addAll(defect.images)
             
             // Add images from defect.attachments
-            val attachmentImages = defect.attachments.filter { it.type == "image" }.map { it.uri }
+            val attachmentImages = defect.attachments.filter { 
+                it.type == "image" || it.type.startsWith("image/")
+            }.map { it.uri }
             allImages.addAll(attachmentImages)
             
             if (allImages.isNotEmpty()) {
-                allImages.take(3).joinToString("") { imagePath ->
+                println("PDF Report: Processing ${allImages.size} images for defect: ${defect.location}")
+                allImages.take(5).forEachIndexed { index, imagePath ->
+                    println("PDF Report: Processing image $index: $imagePath")
+                }
+                allImages.take(5).joinToString("<br>") { imagePath ->
                     try {
                         // Try to convert image to base64 for PDF embedding
                         val base64Image = convertImageToBase64(imagePath)
                         if (base64Image != null) {
+                            println("PDF Report: Successfully converted image: $imagePath")
                             """
                             <img src="data:image/jpeg;base64,$base64Image" class="defect-image" alt="Defect Image" />
                             """.trimIndent()
                         } else {
+                            println("PDF Report: Failed to convert image: $imagePath")
                             """
                             <div class="defect-image-placeholder">Image: ${imagePath.substringAfterLast("/")}</div>
                             """.trimIndent()
                         }
                     } catch (e: Exception) {
+                        println("PDF Report: Exception converting image: $imagePath - ${e.message}")
                         """
                         <div class="defect-image-placeholder">Image: ${imagePath.substringAfterLast("/")}</div>
                         """.trimIndent()
@@ -433,31 +442,40 @@ class DefectReportGenerator(private val context: Context) {
     
     private fun convertImageToBase64(imagePath: String): String? {
         return try {
+            println("PDF Report: Converting image to base64: $imagePath")
             val bitmap = if (imagePath.startsWith("content://")) {
                 // Handle content URI (from gallery/camera)
+                println("PDF Report: Processing content URI")
                 val uri = Uri.parse(imagePath)
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     BitmapFactory.decodeStream(inputStream)
                 }
             } else if (imagePath.startsWith("file://")) {
                 // Handle file URI
+                println("PDF Report: Processing file URI")
                 val file = File(imagePath.substring(7)) // Remove "file://" prefix
                 if (!file.exists()) {
+                    println("PDF Report: File does not exist: ${file.absolutePath}")
                     return null
                 }
                 BitmapFactory.decodeFile(file.absolutePath)
             } else {
                 // Handle direct file path
+                println("PDF Report: Processing direct file path")
                 val file = File(imagePath)
                 if (!file.exists()) {
+                    println("PDF Report: File does not exist: ${file.absolutePath}")
                     return null
                 }
                 BitmapFactory.decodeFile(imagePath)
             }
             
             if (bitmap == null) {
+                println("PDF Report: Failed to decode bitmap from: $imagePath")
                 return null
             }
+            
+            println("PDF Report: Successfully decoded bitmap: ${bitmap.width}x${bitmap.height}")
             
             // Resize bitmap to reduce size for PDF
             val maxWidth = 400
@@ -475,8 +493,12 @@ class DefectReportGenerator(private val context: Context) {
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
             val byteArray = outputStream.toByteArray()
             
-            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+            val base64String = Base64.encodeToString(byteArray, Base64.NO_WRAP)
+            println("PDF Report: Successfully converted to base64: ${byteArray.size} bytes")
+            base64String
         } catch (e: Exception) {
+            println("PDF Report: Exception in convertImageToBase64: ${e.message}")
+            e.printStackTrace()
             null
         }
     }

@@ -143,14 +143,32 @@ fun AddEditDefectScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            val timestamp = System.currentTimeMillis()
-            val fileName = "Gallery_${timestamp}.jpg"
+            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(nameIndex)
+                } else {
+                    "Gallery_${System.currentTimeMillis()}.jpg"
+                }
+            } ?: "Gallery_${System.currentTimeMillis()}.jpg"
+            
+            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && cursor.moveToFirst()) {
+                    cursor.getLong(sizeIndex)
+                } else {
+                    0L
+                }
+            } ?: 0L
+            
+            val fileType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            
             val newAttachment = FileAttachment(
                 id = UUID.randomUUID().toString(),
                 name = fileName,
-                type = "image",
+                type = fileType,
                 uri = uri.toString(),
-                size = 0L
+                size = fileSize
             )
             selectedAttachments = selectedAttachments + newAttachment
         }
