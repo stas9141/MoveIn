@@ -603,6 +603,9 @@ fun MoveInApp() {
                         onProfileClick = {
                             appState.navigateTo(Screen.Settings)
                         },
+                        onSignInClick = {
+                            appState.navigateTo(Screen.Login)
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
                 } ?: run {

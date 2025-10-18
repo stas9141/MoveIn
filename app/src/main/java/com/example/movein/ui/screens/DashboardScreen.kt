@@ -248,16 +248,16 @@ fun DashboardScreen(
                                 )
                             }
                         } else {
-                            // Save Your Work button for anonymous users
+                            // Sign In button for anonymous users
                             OutlinedButton(
-                                onClick = onCreateAccountClick,
+                                onClick = onSignInClick,
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
                                 ),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                             ) {
                                 Text(
-                                    text = "Save Your Work",
+                                    text = "Sign In",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Medium
                                     )
