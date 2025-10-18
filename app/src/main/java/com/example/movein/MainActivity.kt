@@ -42,6 +42,7 @@ import com.example.movein.ui.screens.DefectDetailScreen
 import com.example.movein.ui.screens.CalendarScreen
 import com.example.movein.ui.screens.SimpleLoginScreen
 import com.example.movein.ui.screens.SimpleSignUpScreen
+import com.example.movein.ui.screens.MyApartmentScreen
 import com.example.movein.ui.screens.ForgotPasswordScreen
 import com.example.movein.ui.screens.ResetPasswordScreen
 import com.example.movein.ui.screens.ReportConfigurationScreen
@@ -645,6 +646,15 @@ fun MoveInApp() {
                     onBackClick = {
                         appState.navigateTo(Screen.Dashboard)
                     },
+                    onMyApartmentClick = {
+                        appState.navigateTo(Screen.MyApartment)
+                    },
+                    onCreateAccountClick = {
+                        appState.navigateTo(Screen.SignUp)
+                    },
+                    onSignInClick = {
+                        appState.navigateTo(Screen.Login)
+                    },
                     onReorganizeTasks = {
                         appState.reorganizeTasksByDueDate()
                     },
@@ -801,62 +811,14 @@ fun MoveInApp() {
                 )
             }
             
-            Screen.Settings -> {
-                SettingsScreen(
-                    isDarkMode = appState.isDarkMode,
-                    onDarkModeToggle = { appState.toggleDarkMode() },
+            Screen.MyApartment -> {
+                MyApartmentScreen(
+                    userData = appState.userData,
+                    hasCompletedOnboarding = appState.userData != null && appState.checklistData != null,
                     onBackClick = {
-                        appState.navigateTo(Screen.Dashboard)
+                        appState.navigateTo(Screen.Settings)
                     },
-                    onReorganizeTasks = {
-                        appState.reorganizeTasksByDueDate()
-                    },
-                    onClearData = {
-                        coroutineScope.launch {
-                            appState.clearAllData()
-                        }
-                    },
-                    onGenerateReport = {
-                        appState.navigateTo(Screen.ReportConfiguration)
-                    },
-                    onTutorialClick = {
-                        tutorialState.showTutorial(
-                            "Settings",
-                            "Manage app preferences, data, and reports here. You can also sign out or clear all local data."
-                        )
-                    },
-                    authState = appState.authState,
-                    syncStatus = appState.cloudSyncStatus,
-                    onForceSync = {
-                        coroutineScope.launch {
-                            appState.forceSync()
-                        }
-                    },
-                    onSignOut = {
-                        coroutineScope.launch {
-                            appState.secureLogout()
-                        }
-                    },
-                    onLogoutAllDevices = {
-                        coroutineScope.launch {
-                            try {
-                                val authManager = AuthManager(context)
-                                val result = authManager.logoutAllDevices()
-                                if (result.isSuccess) {
-                                    // Show success message
-                                    println("Successfully logged out from all devices")
-                                    // Also sign out locally
-                                    appState.signOut()
-                                } else {
-                                    // Show error message
-                                    val error = result.exceptionOrNull()
-                                    println("Failed to logout from all devices: ${error?.message}")
-                                }
-                            } catch (e: Exception) {
-                                println("Error logging out from all devices: ${e.message}")
-                            }
-                        }
-                    },
+                    onEditClick = { /* Handle edit */ },
                     modifier = Modifier.padding(innerPadding)
                 )
             }

@@ -1,26 +1,24 @@
 package com.example.movein.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.movein.ui.components.SimpleSyncStatusCard
 import com.example.movein.shared.cloud.AuthState
 import com.example.movein.shared.cloud.SyncStatus
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @Composable
 fun SettingsScreen(
@@ -31,6 +29,9 @@ fun SettingsScreen(
     onClearData: () -> Unit,
     onGenerateReport: () -> Unit,
     onTutorialClick: (() -> Unit)? = null,
+    onMyApartmentClick: () -> Unit,
+    onCreateAccountClick: () -> Unit,
+    onSignInClick: () -> Unit,
     authState: AuthState,
     syncStatus: SyncStatus,
     onForceSync: () -> Unit,
@@ -40,11 +41,11 @@ fun SettingsScreen(
 ) {
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(true) }
+    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
-        // Top Bar
+        // Top Bar - SIMPLIFIED
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -64,111 +65,21 @@ fun SettingsScreen(
                     .padding(start = 8.dp)
                     .weight(1f)
             )
-            
-            // Tutorial button
-            onTutorialClick?.let { onTutorial ->
-                IconButton(onClick = onTutorial) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Start Tutorial",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
         }
         
-        // User Profile Section
-        if (authState.isAuthenticated && authState.email != null) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Profile Avatar
-                    Card(
-                        modifier = Modifier.size(60.dp),
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                    
-                    // User Information
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Welcome back!",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = "Email",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = authState.email ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        Text(
-                            text = "Your account is securely synced",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            }
-        }
         
         // Settings Content
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Appearance Section
+            // My Apartment Section
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onMyApartmentClick() },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
@@ -177,66 +88,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Appearance",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        
-                        // Dark Mode Toggle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                                                        Icon(
-                                            imageVector = if (isDarkMode) Icons.Default.Close else Icons.Default.Check,
-                                            contentDescription = "Theme Icon",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(end = 12.dp)
-                                        )
-                                
-                                Column {
-                                    Text(
-                                        text = if (isDarkMode) "Dark Mode" else "Light Mode",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    )
-                                    Text(
-                                        text = if (isDarkMode) "Dark theme enabled" else "Light theme enabled",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            
-                            Switch(
-                                checked = isDarkMode,
-                                onCheckedChange = onDarkModeToggle
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Notifications Section
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Notifications",
+                            text = "My Apartment",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -252,107 +104,131 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = "Notifications",
+                                    imageVector = Icons.Default.Home,
+                                    contentDescription = "Apartment",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(end = 12.dp)
                                 )
                                 
                                 Column {
                                     Text(
-                                        text = "Task Reminders",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                        text = "View & Edit Apartment Details",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = if (notificationsEnabled) "Notifications enabled" else "Notifications disabled",
+                                        text = "Manage your apartment information",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                             
-                            Switch(
-                                checked = notificationsEnabled,
-                                onCheckedChange = { notificationsEnabled = it }
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowRight,
+                                contentDescription = "Navigate",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
             }
             
-            // Cloud Sync Section
-            item {
-                SimpleSyncStatusCard(
-                    authState = authState,
-                    syncStatus = syncStatus,
-                    onForceSync = onForceSync,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            
-            // Authentication Section
-            if (authState.isAuthenticated) {
+            // Save Your Work Section (for anonymous users)
+            if (!authState.isAuthenticated) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = "Account",
-                                style = MaterialTheme.typography.titleSmall.copy(
+                                text = "Save Your Work",
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold
                                 ),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             
                             Text(
-                                text = "Signed in as: ${authState.email ?: "Unknown"}",
+                                text = "Create an account to sync your data across devices and never lose your progress.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(bottom = 16.dp)
                             )
                             
-                Button(
-                                onClick = { showSignOutDialog = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
-                                ),
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "Sign Out",
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            OutlinedButton(
-                                onClick = onLogoutAllDevices,
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "Log out of all devices",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                                Button(
+                                    onClick = onCreateAccountClick,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text("Create Account")
+                                }
+                                
+                                OutlinedButton(
+                                    onClick = onSignInClick,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text("Sign In")
+                                }
                             }
                         }
                     }
                 }
             }
             
-            // Clear Data Section
+            // App Preferences Section
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "App Preferences",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        // Dark Mode Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Dark Mode",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Switch(
+                                checked = isDarkMode,
+                                onCheckedChange = onDarkModeToggle
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Data Management Section
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -365,42 +241,107 @@ fun SettingsScreen(
                     ) {
                         Text(
                             text = "Data Management",
-                            style = MaterialTheme.typography.titleSmall.copy(
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
                         
+                        // Reorganize Tasks Button
                         Button(
                             onClick = onReorganizeTasks,
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Reorganize Tasks by Due Date",
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
+                        ) {
+                            Text("Reorganize Tasks by Due Date")
                         }
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
+                        // Generate Report Button
                         Button(
                             onClick = onGenerateReport,
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                            )
+                        ) {
+                            Text("Generate Report")
+                        }
+                    }
+                }
+            }
+            
+            // Account Management Section (for authenticated users)
+            if (authState.isAuthenticated) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = "Generate Defect Report",
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                text = "Account Management",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                modifier = Modifier.padding(bottom = 16.dp)
                             )
+                            
+                            // Sign Out Button
+                            Button(
+                                onClick = { showSignOutDialog = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Sign Out")
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Logout All Devices Button
+                            OutlinedButton(
+                                onClick = onLogoutAllDevices,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Logout from All Devices")
+                            }
                         }
+                    }
+                }
+            }
+            
+            // Clear Data Section (for all users)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Clear Data",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
+                        // Clear All Data Button
                         Button(
                             onClick = { showClearDataDialog = true },
                             colors = ButtonDefaults.buttonColors(
@@ -408,21 +349,12 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "Clear User Data",
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            Text("Clear All Data")
                         }
-                        
-                        Text(
-                            text = "Reorganize: Moves tasks to correct hosts based on due dates. Clear: Removes your personal data only.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
                     }
                 }
             }
+            
             
             // About Section
             item {
@@ -436,7 +368,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "About",
+                            text = "About MoveIn",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -444,23 +376,36 @@ fun SettingsScreen(
                         )
                         
                         Text(
-                            text = "MoveIn - Your New Home Companion",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
+                            text = "MoveIn is your comprehensive home inspection and move-in companion. Track tasks, manage defects, and ensure a smooth transition to your new home.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Text(
+                            text = "Key Features:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                         
                         Text(
-                            text = "Version 1.0.0",
+                            text = "• Task Management & Progress Tracking\n• Defect Reporting & Photo Documentation\n• Personalized Checklists\n• Cloud Sync & Data Backup\n• Biometric Security\n• Apartment Profile Management",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
                         Text(
-                            text = "MoveIn is the essential companion for new apartment owners. From the moment you receive your keys, our app helps you transform your new space into a home. It guides you through the entire process with smart, pre-populated task lists, from setting up utilities to decorating. More importantly, our powerful defect management system allows you to effortlessly document and track any issues, complete with photos and specific locations, ensuring you get everything resolved with the building company. Stay organized, manage your to-dos, and get peace of mind with the only app designed to make your move-in process seamless and stress-free.",
+                            text = "Security & Privacy:",
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        
+                        Text(
+                            text = "• Biometric Authentication\n• Data Isolation\n• Secure Storage\n• Cross-Device Sync",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -485,10 +430,9 @@ fun SettingsScreen(
                     text = "This will permanently delete your personal data including:\n\n" +
                             "• User profile and apartment details\n" +
                             "• Your custom tasks and notes\n" +
-                            "• All defects and reports you created\n" +
-                            "• Authentication tokens\n\n" +
-                            "Predefined tasks will remain available.\n\n" +
-                            "Are you sure you want to continue?",
+                            "• All defect reports and photos\n" +
+                            "• App preferences and settings\n\n" +
+                            "This action cannot be undone. Are you sure you want to continue?",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -503,7 +447,7 @@ fun SettingsScreen(
                     )
                 ) {
                     Text(
-                        text = "Yes, Clear Data",
+                        "Clear Data",
                         color = MaterialTheme.colorScheme.onError
                     )
                 }
@@ -531,8 +475,7 @@ fun SettingsScreen(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to sign out?\n\n" +
-                            "You will need to sign in again to access your data.",
+                    text = "Are you sure you want to sign out? You'll need to sign in again to access your data.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -547,7 +490,7 @@ fun SettingsScreen(
                     )
                 ) {
                     Text(
-                        text = "Sign Out",
+                        "Sign Out",
                         color = MaterialTheme.colorScheme.onError
                     )
                 }
@@ -562,3 +505,5 @@ fun SettingsScreen(
         )
     }
 }
+
+

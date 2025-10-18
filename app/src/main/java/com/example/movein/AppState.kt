@@ -44,7 +44,7 @@ class AppState(
     var selectedTask by mutableStateOf<ChecklistItem?>(null)
         private set
     
-    var defects by mutableStateOf<List<Defect>>(appStorage?.loadDefects() ?: emptyList())
+    var defects by mutableStateOf<List<Defect>>(emptyList())
         private set
     
     var selectedDefect by mutableStateOf<Defect?>(null)
@@ -64,6 +64,11 @@ class AppState(
     
     // Anonymous user support
     var isAnonymousUser by mutableStateOf(true)
+    
+    // Registration prompt tracking
+    var hasShownRegistrationPrompt by mutableStateOf(false)
+    var tasksCreatedCount by mutableStateOf(0)
+    var defectsCreatedCount by mutableStateOf(0)
     
     // Pending data for migration when user signs up
     var pendingUserData by mutableStateOf<UserData?>(null)
@@ -101,6 +106,12 @@ class AppState(
                 }
             }
         }
+        
+        // Load defects and tasks for current user
+        coroutineScope.launch {
+            loadDefectsForCurrentUser()
+            loadTasksForCurrentUser()
+        }
     }
     
     fun initializeCloudSync() {
@@ -110,9 +121,9 @@ class AppState(
     
     private fun observeCloudStorage() {
         if (cloudStorage == null) {
-            // If cloud storage is not available, set default states
-            authState = AuthState(false, error = "Cloud storage not available")
-            syncStatus = SyncStatus(error = "Cloud storage not available")
+            // If cloud storage is not available, set default states for anonymous users
+            authState = AuthState(false) // No error message for anonymous users
+            syncStatus = SyncStatus() // Default sync status
             return
         }
         
@@ -156,30 +167,103 @@ class AppState(
                 appStorage?.loadUserData()
             }
             
-            if (savedUserData != null) {
+            // Only load user data if there's also checklist data (indicating completed onboarding)
+            // This prevents new users from seeing old data from previous app sessions
+            val savedChecklistData = if (offlineStorage != null) {
+                coroutineScope.launch {
+                    offlineStorage.loadChecklistData().getOrNull()
+                }
+                appStorage?.loadChecklistData() // Fallback to local storage for immediate loading
+            } else {
+                appStorage?.loadChecklistData()
+            }
+            
+            if (savedUserData != null && savedChecklistData != null) {
                 userData = savedUserData
-                // Load checklist data
-                val savedChecklistData = if (offlineStorage != null) {
-                    coroutineScope.launch {
-                        offlineStorage.loadChecklistData().getOrNull()
-                    }
-                    appStorage?.loadChecklistData() // Fallback to local storage for immediate loading
-                } else {
-                    appStorage?.loadChecklistData()
-                }
-                
-                if (savedChecklistData != null) {
-                    checklistData = savedChecklistData
-                } else {
-                    // Generate fresh checklist if none saved
-                    checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(savedUserData)
-                }
+                // Don't set checklistData here - it will be loaded user-specifically
+                // This prevents new users from seeing previous test data
+            } else {
+                // If no checklist data, don't load user data (user hasn't completed onboarding)
+                userData = null
             }
         } catch (e: Exception) {
             // If there's an error loading data, initialize with defaults
             userData = null
             checklistData = null
         }
+    }
+    
+    /**
+     * Load defects for the current user (authenticated or anonymous)
+     * This ensures user-specific data isolation
+     */
+    private suspend fun loadDefectsForCurrentUser() {
+        try {
+            if (authState.isAuthenticated) {
+                // For authenticated users, load from cloud storage
+                val cloudDefectsResult = cloudStorage?.loadDefects()
+                if (cloudDefectsResult?.isSuccess == true) {
+                    defects = cloudDefectsResult.getOrNull() ?: emptyList()
+                } else {
+                    // Fallback to local storage for authenticated users
+                    defects = appStorage?.loadDefects() ?: emptyList()
+                }
+            } else {
+                // For anonymous users, start with empty defects list
+                // This ensures new users don't see previous test data
+                defects = emptyList()
+            }
+        } catch (e: Exception) {
+            // On error, start with empty list for new users
+            defects = emptyList()
+        }
+    }
+    
+    /**
+     * Load tasks for the current user (authenticated or anonymous)
+     * This ensures user-specific data isolation
+     */
+    private suspend fun loadTasksForCurrentUser() {
+        try {
+            if (authState.isAuthenticated) {
+                // For authenticated users, load from cloud storage
+                val cloudChecklistDataResult = cloudStorage?.loadChecklistData()
+                if (cloudChecklistDataResult?.isSuccess == true) {
+                    checklistData = cloudChecklistDataResult.getOrNull()
+                } else {
+                    // Fallback to local storage for authenticated users
+                    checklistData = appStorage?.loadChecklistData()
+                }
+            } else {
+                // For anonymous users, generate fresh checklist based on user data
+                // This ensures new users don't see previous test data
+                if (userData != null) {
+                    checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(userData!!)
+                } else {
+                    // If no user data, start with null (will be generated when user data is set)
+                    checklistData = null
+                }
+            }
+        } catch (e: Exception) {
+            // On error, start with null for new users
+            checklistData = null
+        }
+    }
+    
+    /**
+     * Reload defects after authentication state changes
+     * This should be called after successful login/signup
+     */
+    suspend fun reloadDefectsForCurrentUser() {
+        loadDefectsForCurrentUser()
+    }
+    
+    /**
+     * Reload tasks after authentication state changes
+     * This should be called after successful login/signup
+     */
+    suspend fun reloadTasksForCurrentUser() {
+        loadTasksForCurrentUser()
     }
 
     fun navigateTo(screen: Screen) {
@@ -223,31 +307,236 @@ class AppState(
             appStorage?.saveUserData(data)
             appStorage?.saveChecklistData(checklistData!!)
         }
+        
+        // Reload tasks to ensure user-specific data
+        coroutineScope.launch {
+            loadTasksForCurrentUser()
+        }
     }
     
     fun initializeAnonymousUserData(data: UserData) {
         userData = data
         isAnonymousUser = true
+        authState = AuthState(false) // Ensure authentication state is false for anonymous users
         // Generate personalized checklist based on user data
         checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(data)
         
         // Save to local storage only (no cloud sync for anonymous users)
         appStorage?.saveUserData(data)
         appStorage?.saveChecklistData(checklistData!!)
+        
+        // Reload tasks to ensure user-specific data
+        coroutineScope.launch {
+            loadTasksForCurrentUser()
+        }
     }
     
-    fun migrateAnonymousDataToAccount() {
-        if (isAnonymousUser && userData != null && checklistData != null) {
-            // Migrate data to cloud storage
-            if (offlineStorage != null) {
-                coroutineScope.launch {
-                    offlineStorage.saveUserData(userData!!)
-                    offlineStorage.saveChecklistData(checklistData!!)
-                    // Also migrate any defects
-                    offlineStorage.saveDefects(defects)
+    /**
+     * Migration result data class
+     */
+    data class MigrationResult(
+        val success: Boolean,
+        val migratedItems: Int,
+        val errors: List<String> = emptyList(),
+        val message: String
+    )
+    
+    /**
+     * Enhanced data migration with progress tracking and error handling
+     */
+    suspend fun migrateAnonymousDataToAccount(): Result<MigrationResult> {
+        return try {
+            println("AppState: Starting migration - isAnonymousUser: $isAnonymousUser, authState.isAuthenticated: ${authState.isAuthenticated}")
+            
+            // Only migrate if user was anonymous and is now becoming authenticated
+            // If user is already authenticated (existing user), no migration needed
+            if (!isAnonymousUser || authState.isAuthenticated) {
+                println("AppState: User is already authenticated or not anonymous, no migration needed")
+                return Result.success(MigrationResult(
+                    success = true,
+                    migratedItems = 0,
+                    message = "User is already authenticated"
+                ))
+            }
+            
+            if (userData == null && checklistData == null && defects.isEmpty()) {
+                println("AppState: No data to migrate")
+                return Result.success(MigrationResult(
+                    success = true,
+                    migratedItems = 0,
+                    message = "No data to migrate"
+                ))
+            }
+            
+            // Check if there's actually meaningful data to migrate
+            val hasUserData = userData != null
+            val hasChecklistData = checklistData != null
+            val hasDefects = defects.isNotEmpty()
+            
+            println("AppState: Data check - userData: $hasUserData, checklistData: $hasChecklistData, defects: $hasDefects")
+            
+            // If no meaningful data, skip migration
+            if (!hasUserData && !hasChecklistData && !hasDefects) {
+                println("AppState: No meaningful data to migrate, skipping migration")
+                return Result.success(MigrationResult(
+                    success = true,
+                    migratedItems = 0,
+                    message = "No data to migrate"
+                ))
+            }
+            
+            println("AppState: Found data to migrate - userData: ${userData != null}, checklistData: ${checklistData != null}, defects: ${defects.size}")
+            
+            var migratedItems = 0
+            val errors = mutableListOf<String>()
+            
+            // Migrate user data
+            if (userData != null) {
+                try {
+                    offlineStorage?.saveUserData(userData!!)
+                    migratedItems++
+                } catch (e: Exception) {
+                    errors.add("Failed to migrate user data: ${e.message}")
                 }
             }
-            isAnonymousUser = false
+            
+            // Migrate checklist data
+            if (checklistData != null) {
+                try {
+                    offlineStorage?.saveChecklistData(checklistData!!)
+                    migratedItems++
+                } catch (e: Exception) {
+                    errors.add("Failed to migrate checklist data: ${e.message}")
+                }
+            }
+            
+            // Migrate defects
+            if (defects.isNotEmpty()) {
+                try {
+                    offlineStorage?.saveDefects(defects)
+                    migratedItems++
+                } catch (e: Exception) {
+                    errors.add("Failed to migrate defects: ${e.message}")
+                }
+            }
+            
+            val success = errors.isEmpty()
+            if (success) {
+                isAnonymousUser = false
+            }
+            
+            val message = if (success) {
+                "Successfully migrated $migratedItems data items to your account"
+            } else {
+                "Migration completed with ${errors.size} errors. Some data may not have been synced."
+            }
+            
+            println("AppState: Migration completed - success: $success, migratedItems: $migratedItems, message: $message")
+            
+            Result.success(MigrationResult(
+                success = success,
+                migratedItems = migratedItems,
+                errors = errors,
+                message = message
+            ))
+            
+        } catch (e: Exception) {
+            println("AppState: Migration failed with exception: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Legacy migration function for backward compatibility
+     */
+    fun migrateAnonymousDataToAccountLegacy() {
+        coroutineScope.launch {
+            migrateAnonymousDataToAccount()
+        }
+    }
+    
+    /**
+     * Check if registration prompt should be shown
+     */
+    fun shouldShowRegistrationPrompt(): Boolean {
+        if (authState.isAuthenticated || hasShownRegistrationPrompt) {
+            return false
+        }
+        
+        // Don't show prompt during onboarding - only after user has completed it
+        // and is actively using the app (has created some data)
+        if (userData == null || checklistData == null) {
+            return false
+        }
+        
+        // Show prompt after user has created some tasks (indicating they're actively using the app)
+        if (tasksCreatedCount >= 3) {
+            return true
+        }
+        
+        // Show prompt after user has created some defects (indicating they're actively using the app)
+        if (defectsCreatedCount >= 2) {
+            return true
+        }
+        
+        // Show prompt after user has completed some tasks (indicating engagement)
+        val completedTasks = checklistData?.let { data ->
+            data.firstWeek.count { it.isCompleted } + 
+            data.firstMonth.count { it.isCompleted } + 
+            data.firstYear.count { it.isCompleted }
+        } ?: 0
+        if (completedTasks >= 2) {
+            return true
+        }
+        
+        return false
+    }
+    
+    /**
+     * Get the appropriate registration prompt type
+     */
+    fun getRegistrationPromptType(): String {
+        return when {
+            tasksCreatedCount >= 5 || defectsCreatedCount >= 3 -> 
+                "AFTER_MULTIPLE_TASKS"
+            tasksCreatedCount >= 1 || defectsCreatedCount >= 1 -> 
+                "AFTER_FIRST_TASKS"
+            else -> 
+                "GENERAL_PROMPT"
+        }
+    }
+    
+    /**
+     * Mark registration prompt as shown
+     */
+    fun markRegistrationPromptShown() {
+        hasShownRegistrationPrompt = true
+    }
+    
+    /**
+     * Track task creation for prompt logic
+     */
+    fun trackTaskCreated() {
+        tasksCreatedCount++
+    }
+    
+    /**
+     * Track defect creation for prompt logic
+     */
+    fun trackDefectCreated() {
+        defectsCreatedCount++
+    }
+    
+    /**
+     * Set user as anonymous (continue without account)
+     * This ensures the authentication state is properly reset
+     */
+    fun setAnonymousUser() {
+        isAnonymousUser = true
+        authState = AuthState(false) // Ensure authentication state is false
+        // Clear any stored authentication data
+        coroutineScope.launch {
+            secureTokenStorage?.clearTokens()
         }
     }
     

@@ -105,9 +105,13 @@ fun SimpleLoginScreen(
         error?.let { errorMessage ->
             // Debug logging
             println("SimpleLoginScreen: Displaying error: $errorMessage")
+            println("SimpleLoginScreen: Error type: ${errorMessage::class.simpleName}")
             
             val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
             val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
+            
+            println("SimpleLoginScreen: User-friendly error: $userFriendlyError")
+            println("SimpleLoginScreen: Error type: $errorType")
             
             ErrorDisplay(
                 error = userFriendlyError,

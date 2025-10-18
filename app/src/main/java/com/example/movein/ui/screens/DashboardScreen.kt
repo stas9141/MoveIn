@@ -57,6 +57,8 @@ fun DashboardScreen(
     onDismissAddTaskDialog: () -> Unit = {},
     userEmail: String? = null,
     onProfileClick: () -> Unit = {},
+    onCreateAccountClick: () -> Unit = {},
+    onSignInClick: () -> Unit = {},
     selectedTaskId: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -207,7 +209,7 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f)
                         )
                         
-                        // Profile section
+                        // Profile section or Create Account button
                         if (userEmail != null) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -243,6 +245,22 @@ fun DashboardScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.clickable { onProfileClick() }
+                                )
+                            }
+                        } else {
+                            // Save Your Work button for anonymous users
+                            OutlinedButton(
+                                onClick = onCreateAccountClick,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = "Save Your Work",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 )
                             }
                         }

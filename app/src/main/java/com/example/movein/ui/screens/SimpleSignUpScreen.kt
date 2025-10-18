@@ -100,7 +100,24 @@ fun SimpleSignUpScreen(
             modifier = Modifier.padding(top = 8.dp)
         )
         
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Sign In Link - Moved to top for better UX
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Already have an account? ",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = onSignInClick) {
+                Text("Sign In")
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
         
         // Error Messages
         error?.let { errorMessage ->
@@ -267,20 +284,5 @@ fun SimpleSignUpScreen(
         }
         
         Spacer(modifier = Modifier.height(32.dp))
-        
-        // Sign In Link
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Already have an account? ",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            TextButton(onClick = onSignInClick) {
-                Text("Sign In")
-            }
-        }
     }
 }
