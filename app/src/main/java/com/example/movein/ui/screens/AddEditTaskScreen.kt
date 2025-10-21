@@ -498,7 +498,8 @@ fun AddEditTaskScreen(
                                     onReview = {
                                         selectedAttachment = attachment
                                         showFileReviewDialog = true
-                                    }
+                                    },
+                                    showDeleteButton = true
                                 )
                                 
                                 if (attachment != selectedAttachments.last()) {
@@ -693,9 +694,6 @@ fun AddEditTaskScreen(
                 } catch (e: Exception) {
                     // Handle error
                 }
-            },
-            onAddFile = {
-                fileLauncher.launch("*/*")
             },
             onAddGallery = {
                 galleryLauncher.launch("image/*")

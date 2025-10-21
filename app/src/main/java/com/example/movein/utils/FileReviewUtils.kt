@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.io.println
 
 object FileReviewUtils {
     
@@ -273,28 +274,45 @@ fun rememberImageBitmap(uri: String?): ImageBitmap? {
     
     LaunchedEffect(uri) {
         if (uri != null) {
+            println("FileReview: Loading image from URI: $uri")
             isLoading = true
             bitmap = withContext(Dispatchers.IO) {
                 try {
                     val parsedUri = Uri.parse(uri)
+                    println("FileReview: Parsed URI scheme: ${parsedUri.scheme}")
                     
                     // For content URIs, try to get the actual file path first
                     val inputStream = if (parsedUri.scheme == "content") {
+                        println("FileReview: Using ContentResolver for content URI")
                         // For content URIs, we need to use ContentResolver
                         context.contentResolver.openInputStream(parsedUri)
                     } else {
+                        println("FileReview: Using FileInputStream for file URI")
                         // For file URIs, try direct file access
                         java.io.FileInputStream(parsedUri.path ?: "")
                     }
                     
-                    inputStream?.use { input ->
+                    if (inputStream == null) {
+                        println("FileReview: Failed to open input stream for URI: $uri")
+                        return@withContext null
+                    }
+                    
+                    inputStream.use { input ->
                         val options = android.graphics.BitmapFactory.Options().apply {
                             inJustDecodeBounds = false
                             inSampleSize = 2 // Reduce memory usage for large images
                         }
-                        android.graphics.BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
+                        val decodedBitmap = android.graphics.BitmapFactory.decodeStream(input, null, options)
+                        if (decodedBitmap != null) {
+                            println("FileReview: Successfully decoded bitmap: ${decodedBitmap.width}x${decodedBitmap.height}")
+                            decodedBitmap.asImageBitmap()
+                        } else {
+                            println("FileReview: Failed to decode bitmap from stream")
+                            null
+                        }
                     }
                 } catch (e: Exception) {
+                    println("FileReview: Exception loading image: ${e.message}")
                     e.printStackTrace()
                     null
                 } finally {
@@ -302,6 +320,7 @@ fun rememberImageBitmap(uri: String?): ImageBitmap? {
                 }
             }
         } else {
+            println("FileReview: URI is null")
             isLoading = false
         }
     }

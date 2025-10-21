@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,7 +15,6 @@ import android.net.Uri
 fun AttachmentDialog(
     onDismiss: () -> Unit,
     onAddImage: (Uri) -> Unit,
-    onAddFile: () -> Unit,
     onAddGallery: () -> Unit
 ) {
     AlertDialog(
@@ -28,61 +26,44 @@ fun AttachmentDialog(
             ) {
                 Text("Choose how you want to add an attachment:")
                 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Camera button
+                    // Take Photo button
                     OutlinedButton(
                         onClick = { onAddImage(Uri.EMPTY) }, // This will be handled by the caller
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
                                 Icons.Default.Add,
-                                contentDescription = "Camera",
+                                contentDescription = "Take Photo",
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Camera")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Take Photo")
                         }
                     }
                     
-                    // Gallery button
+                    // Choose from Gallery button
                     OutlinedButton(
                         onClick = onAddGallery,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
                                 Icons.Default.Star,
-                                contentDescription = "Gallery",
+                                contentDescription = "Choose from Gallery",
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Gallery")
-                        }
-                    }
-                    
-                    // File button
-                    OutlinedButton(
-                        onClick = onAddFile,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = "File",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("File")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Choose from Gallery")
                         }
                     }
                 }

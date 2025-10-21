@@ -73,7 +73,6 @@ data class Defect(
     val createdAt: String,
     val dueDate: String? = null,
     val closedAt: String? = null,
-    val subTasks: List<SubTask> = emptyList(),
     val notes: String = "",
     val assignedTo: String? = null
 )

@@ -50,6 +50,7 @@ import com.example.movein.utils.formatDateForDisplay
 import com.example.movein.utils.PermissionUtils
 import com.example.movein.utils.rememberPermissionState
 import com.example.movein.utils.ImageUtils
+import com.example.movein.AppState
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -81,6 +82,7 @@ fun AddEditDefectScreen(
     userData: UserData? = null,
     onSave: (Defect) -> Unit,
     onBack: () -> Unit,
+    appState: AppState? = null,
     modifier: Modifier = Modifier
 ) {
     var location by remember { mutableStateOf(defect?.location ?: "") }
@@ -114,63 +116,87 @@ fun AddEditDefectScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
+        showAttachmentDialog = false // Close dialog after camera action
         if (success) {
             pendingCameraUri?.let { uri ->
-                // Get the actual file size from the camera image
-                val fileSize = try {
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.available().toLong()
-                    } ?: 0L
-                } catch (e: Exception) {
-                    0L
+                scope.launch {
+                    // Use file persistence if appState is available
+                    val newAttachment = if (appState != null) {
+                        appState.persistFileAttachment(uri, "Camera_${System.currentTimeMillis()}.jpg", "image/jpeg")
+                    } else {
+                        // Fallback to old behavior if appState is not available
+                        val fileSize = try {
+                            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                inputStream.available().toLong()
+                            } ?: 0L
+                        } catch (e: Exception) {
+                            0L
+                        }
+                        
+                        FileAttachment(
+                            id = UUID.randomUUID().toString(),
+                            name = "Camera_${System.currentTimeMillis()}.jpg",
+                            type = "image/jpeg",
+                            uri = uri.toString(),
+                            size = fileSize
+                        )
+                    }
+                    
+                    if (newAttachment != null) {
+                        selectedAttachments = selectedAttachments + newAttachment
+                    }
                 }
-                
-                val newAttachment = FileAttachment(
-                    id = UUID.randomUUID().toString(),
-                    name = "Camera_${System.currentTimeMillis()}.jpg",
-                    type = "image/jpeg",
-                    uri = uri.toString(),
-                    size = fileSize
-                )
-                selectedAttachments = selectedAttachments + newAttachment
             }
         }
         pendingCameraUri = null
     }
     
     // Gallery launcher
+    val coroutineScope = rememberCoroutineScope()
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
+        showAttachmentDialog = false // Close dialog after gallery action
         if (uri != null) {
-            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                if (nameIndex >= 0 && cursor.moveToFirst()) {
-                    cursor.getString(nameIndex)
+            coroutineScope.launch {
+                val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0 && cursor.moveToFirst()) {
+                        cursor.getString(nameIndex)
+                    } else {
+                        "Gallery_${System.currentTimeMillis()}.jpg"
+                    }
+                } ?: "Gallery_${System.currentTimeMillis()}.jpg"
+                
+                val fileType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                
+                // Use file persistence if appState is available
+                val newAttachment = if (appState != null) {
+                    appState.persistFileAttachment(uri, fileName, fileType)
                 } else {
-                    "Gallery_${System.currentTimeMillis()}.jpg"
+                    // Fallback to old behavior if appState is not available
+                    val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                        if (sizeIndex >= 0 && cursor.moveToFirst()) {
+                            cursor.getLong(sizeIndex)
+                        } else {
+                            0L
+                        }
+                    } ?: 0L
+                    
+                    FileAttachment(
+                        id = UUID.randomUUID().toString(),
+                        name = fileName,
+                        type = fileType,
+                        uri = uri.toString(),
+                        size = fileSize
+                    )
                 }
-            } ?: "Gallery_${System.currentTimeMillis()}.jpg"
-            
-            val fileSize = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                if (sizeIndex >= 0 && cursor.moveToFirst()) {
-                    cursor.getLong(sizeIndex)
-                } else {
-                    0L
+                
+                if (newAttachment != null) {
+                    selectedAttachments = selectedAttachments + newAttachment
                 }
-            } ?: 0L
-            
-            val fileType = context.contentResolver.getType(uri) ?: "image/jpeg"
-            
-            val newAttachment = FileAttachment(
-                id = UUID.randomUUID().toString(),
-                name = fileName,
-                type = fileType,
-                uri = uri.toString(),
-                size = fileSize
-            )
-            selectedAttachments = selectedAttachments + newAttachment
+            }
         }
     }
     
@@ -374,7 +400,6 @@ fun AddEditDefectScreen(
                                     status = defect?.status ?: DefectStatus.OPEN,
                                     createdAt = defect?.createdAt ?: getTodayString(),
                                     dueDate = selectedDueDate,
-                                    subTasks = defect?.subTasks ?: emptyList(),
                                     notes = defect?.notes ?: "",
                                     assignedTo = defect?.assignedTo
                                 )
@@ -663,7 +688,8 @@ fun AddEditDefectScreen(
                                 onReview = {
                                     selectedAttachment = attachment
                                     showFileReviewDialog = true
-                                }
+                                },
+                                showDeleteButton = true
                             )
                             
                             if (attachment != selectedAttachments.last()) {
@@ -708,10 +734,6 @@ fun AddEditDefectScreen(
                     } else {
                         permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
                     }
-                },
-                onAddFile = {
-                    // Launch file picker
-                    fileLauncher.launch("*/*")
                 },
                 onAddGallery = {
                     // Launch gallery

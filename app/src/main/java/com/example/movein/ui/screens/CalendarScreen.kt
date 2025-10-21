@@ -477,7 +477,6 @@ private fun SelectedDateDetails(
                                 status = com.example.movein.shared.data.DefectStatus.OPEN,
                                 createdAt = com.example.movein.utils.getTodayString(),
                                 dueDate = formatDate(selectedDate),
-                                subTasks = emptyList(),
                                 notes = "",
                                 assignedTo = null
                             )

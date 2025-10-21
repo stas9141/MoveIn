@@ -650,15 +650,13 @@ fun TaskDetailScreen(
                                 AttachmentItem(
                                     attachment = attachment,
                                     onDelete = {
-                                        val updatedAttachments = currentTask.attachments.filter { it.id != attachment.id }
-                                        currentTask = currentTask.copy(attachments = updatedAttachments)
-                                        // Immediately save the task with the updated attachments
-                                        onTaskUpdate(currentTask)
+                                        // No delete functionality in details view
                                     },
                                     onReview = {
                                         selectedAttachment = attachment
                                         showFileReviewDialog = true
-                                    }
+                                    },
+                                    showDeleteButton = false
                                 )
                             }
                         }
@@ -885,10 +883,6 @@ fun TaskDetailScreen(
                         permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                     }
                 },
-                onAddFile = {
-                    // Launch file picker
-                    fileLauncher.launch("*/*")
-                },
                 onAddGallery = {
                     // Launch gallery
                     if (PermissionUtils.hasStoragePermission(context)) {
@@ -914,11 +908,7 @@ fun TaskDetailScreen(
                     selectedAttachment = null
                 },
                 onDelete = {
-                    val updatedAttachments = currentTask.attachments.filter { it.id != selectedAttachment!!.id }
-                    currentTask = currentTask.copy(attachments = updatedAttachments)
-                    onTaskUpdate(currentTask)
-                    showFileReviewDialog = false
-                    selectedAttachment = null
+                    // No delete functionality in details view
                 },
                 onShare = {
                     FileReviewUtils.shareFile(context, selectedAttachment!!.uri, selectedAttachment!!.name)
@@ -935,7 +925,8 @@ fun TaskDetailScreen(
 fun AttachmentItem(
     attachment: FileAttachment,
     onDelete: () -> Unit,
-    onReview: () -> Unit
+    onReview: () -> Unit,
+    showDeleteButton: Boolean = true
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -977,8 +968,10 @@ fun AttachmentItem(
                 IconButton(onClick = onReview) {
                     Icon(Icons.Default.Info, contentDescription = "Review")
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                if (showDeleteButton) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    }
                 }
             }
         }
@@ -991,7 +984,6 @@ fun AttachmentItem(
 fun AttachmentDialog(
     onDismiss: () -> Unit,
     onAddImage: () -> Unit,
-    onAddFile: () -> Unit,
     onAddGallery: () -> Unit
 ) {
     AlertDialog(
@@ -1057,32 +1049,6 @@ fun AttachmentDialog(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // File button
-                Button(
-                    onClick = onAddFile,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                    )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Info, 
-                            contentDescription = null, 
-                            modifier = Modifier.padding(end = 8.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
-                        )
-                        Text(
-                            "Add File",
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
-                }
             }
         },
         confirmButton = {

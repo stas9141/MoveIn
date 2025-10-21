@@ -18,6 +18,9 @@ import com.example.movein.offline.SyncStatus as OfflineSyncStatus
 import com.example.movein.navigation.Screen
 import com.example.movein.utils.getTodayString
 import com.example.movein.auth.SecureTokenStorage
+import com.example.movein.utils.FileManager
+import com.example.movein.shared.data.FileAttachment
+import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,7 +31,8 @@ class AppState(
     private val cloudStorage: CloudStorage?,
     private val offlineStorage: OfflineStorageManager?,
     private val coroutineScope: CoroutineScope,
-    private val secureTokenStorage: SecureTokenStorage? = null
+    private val secureTokenStorage: SecureTokenStorage? = null,
+    private val fileManager: FileManager? = null
 ) {
     var currentScreen by mutableStateOf<Screen>(Screen.Welcome)
         private set
@@ -1075,6 +1079,58 @@ class AppState(
         } catch (e: Exception) {
             println("Error clearing user data: ${e.message}")
         }
+    }
+    
+    // File persistence helper methods
+    suspend fun persistFileAttachment(
+        uri: Uri,
+        originalName: String? = null,
+        mimeType: String? = null
+    ): FileAttachment? {
+        return fileManager?.persistFile(uri, originalName, mimeType)
+    }
+    
+    fun getFileUri(filePath: String): Uri? {
+        return fileManager?.getFileUri(filePath)
+    }
+    
+    fun deleteFileAttachment(filePath: String): Boolean {
+        return fileManager?.deleteFile(filePath) ?: false
+    }
+    
+    suspend fun cleanupOrphanedFiles() {
+        val allFilePaths = mutableSetOf<String>()
+        
+        // Collect all file paths from defects
+        defects.forEach { defect ->
+            defect.attachments.forEach { attachment ->
+                allFilePaths.add(attachment.uri)
+            }
+            defect.images.forEach { imagePath ->
+                allFilePaths.add(imagePath)
+            }
+        }
+        
+        // Collect all file paths from tasks
+        checklistData?.let { data ->
+            data.firstWeek.forEach { task ->
+                task.attachments.forEach { attachment ->
+                    allFilePaths.add(attachment.uri)
+                }
+            }
+            data.firstMonth.forEach { task ->
+                task.attachments.forEach { attachment ->
+                    allFilePaths.add(attachment.uri)
+                }
+            }
+            data.firstYear.forEach { task ->
+                task.attachments.forEach { attachment ->
+                    allFilePaths.add(attachment.uri)
+                }
+            }
+        }
+        
+        fileManager?.cleanupOrphanedFiles(allFilePaths)
     }
     
 }

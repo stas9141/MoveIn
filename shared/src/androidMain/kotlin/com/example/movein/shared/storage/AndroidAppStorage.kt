@@ -220,17 +220,10 @@ actual class AppStorage(private val context: Context) {
             put("assignedTo", defect.assignedTo ?: "")
             put("images", JSONArray(defect.images))
             put("attachments", attachmentsToJsonArray(defect.attachments))
-            put("subTasks", subTasksToJsonArray(defect.subTasks))
         }
     }
     
     private fun jsonToDefect(json: JSONObject): Defect {
-        val subTasksArray = json.getJSONArray("subTasks")
-        val subTasks = mutableListOf<SubTask>()
-        for (i in 0 until subTasksArray.length()) {
-            subTasks.add(jsonToSubTask(subTasksArray.getJSONObject(i)))
-        }
-        
         val imagesArray = json.getJSONArray("images")
         val images = mutableListOf<String>()
         for (i in 0 until imagesArray.length()) {
@@ -261,8 +254,7 @@ actual class AppStorage(private val context: Context) {
             notes = json.getString("notes"),
             assignedTo = json.getString("assignedTo").takeIf { it.isNotEmpty() },
             images = images,
-            attachments = attachments,
-            subTasks = subTasks
+            attachments = attachments
         )
     }
     

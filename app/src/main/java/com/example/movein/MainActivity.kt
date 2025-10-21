@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Scaffold
@@ -48,6 +53,7 @@ import com.example.movein.ui.screens.ResetPasswordScreen
 import com.example.movein.ui.screens.ReportConfigurationScreen
 import com.example.movein.ui.theme.MoveInTheme
 import com.example.movein.ui.components.SimpleTutorialDialog
+import com.example.movein.utils.FileManager
 import com.example.movein.ui.components.rememberSimpleTutorialState
 import com.example.movein.ui.components.BottomNavigationBar
 import com.example.movein.ui.components.OfflineIndicator
@@ -127,7 +133,8 @@ fun MoveInApp() {
             null
         }
         
-        val state = AppState(appStorage, cloudStorage, offlineStorage, coroutineScope)
+        val fileManager = FileManager(context)
+        val state = AppState(appStorage, cloudStorage, offlineStorage, coroutineScope, fileManager = fileManager)
         // Initialize cloud sync after AppState is created
         state.initializeCloudSync()
         state
@@ -754,6 +761,7 @@ fun MoveInApp() {
                         appState.clearPendingDefectDueDate()
                         appState.navigateTo(Screen.DefectList)
                     },
+                    appState = appState,
                     modifier = Modifier.padding(innerPadding)
                 )
             }

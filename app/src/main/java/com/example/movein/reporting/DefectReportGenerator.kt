@@ -336,12 +336,21 @@ class DefectReportGenerator(private val context: Context) {
             val allImages = mutableListOf<String>()
             
             // Add images from defect.images
+            println("PDF Report: defect.images count: ${defect.images.size}")
+            defect.images.forEachIndexed { index, image ->
+                println("PDF Report: defect.images[$index]: $image")
+            }
             allImages.addAll(defect.images)
             
             // Add images from defect.attachments
+            println("PDF Report: defect.attachments count: ${defect.attachments.size}")
+            defect.attachments.forEachIndexed { index, attachment ->
+                println("PDF Report: defect.attachments[$index]: type=${attachment.type}, uri=${attachment.uri}")
+            }
             val attachmentImages = defect.attachments.filter { 
                 it.type == "image" || it.type.startsWith("image/")
             }.map { it.uri }
+            println("PDF Report: filtered attachment images count: ${attachmentImages.size}")
             allImages.addAll(attachmentImages)
             
             if (allImages.isNotEmpty()) {
@@ -373,6 +382,9 @@ class DefectReportGenerator(private val context: Context) {
                 }
             } else ""
         } else ""
+        
+        println("PDF Report: Final imagesHtml length: ${imagesHtml.length}")
+        println("PDF Report: Final imagesHtml content: $imagesHtml")
         
         return """
         <div class="defect-item">
