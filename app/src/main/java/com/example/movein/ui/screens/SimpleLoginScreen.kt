@@ -121,8 +121,12 @@ fun SimpleLoginScreen(
         // Error Messages
         error?.let { errorMessage ->
             // Debug logging
-            println("SimpleLoginScreen: Displaying error: $errorMessage")
+            println("SimpleLoginScreen: RAW ERROR MESSAGE: '$errorMessage'")
             println("SimpleLoginScreen: Error type: ${errorMessage::class.simpleName}")
+            println("SimpleLoginScreen: Error length: ${errorMessage.length}")
+            println("SimpleLoginScreen: Error contains 'wrong-password': ${errorMessage.contains("wrong-password", ignoreCase = true)}")
+            println("SimpleLoginScreen: Error contains 'user-not-found': ${errorMessage.contains("user-not-found", ignoreCase = true)}")
+            println("SimpleLoginScreen: Error contains 'invalid-email': ${errorMessage.contains("invalid-email", ignoreCase = true)}")
             
             val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
             val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
