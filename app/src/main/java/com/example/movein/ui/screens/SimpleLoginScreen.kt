@@ -160,6 +160,23 @@ fun SimpleLoginScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                    
+                    // Test pattern matching directly
+                    val patternMatch = errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true)
+                    Text(
+                        text = "Pattern match: $patternMatch",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    
+                    // Test with a simpler pattern
+                    val simpleMatch = errorMessage.contains("supplied auth credentials", ignoreCase = true)
+                    Text(
+                        text = "Simple pattern match: $simpleMatch",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             }
             
