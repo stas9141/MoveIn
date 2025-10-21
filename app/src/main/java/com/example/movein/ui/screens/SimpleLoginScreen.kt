@@ -134,6 +134,37 @@ fun SimpleLoginScreen(
             println("SimpleLoginScreen: User-friendly error: $userFriendlyError")
             println("SimpleLoginScreen: Error type: $errorType")
             
+            // TEMPORARY DEBUG: Show what ErrorHandler is returning
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "DEBUG - ErrorHandler Result:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Raw: '$errorMessage'",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Text(
+                        text = "Processed: '$userFriendlyError'",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
             ErrorDisplay(
                 error = userFriendlyError,
                 errorType = errorType,
