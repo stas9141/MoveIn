@@ -324,12 +324,17 @@ fun MoveInApp() {
                                 val error = result.exceptionOrNull()
                                 Log.e("MainActivity", "Sign-In failed: ${error?.message}")
                                 Log.e("MainActivity", "Sign-In error type: ${error?.javaClass?.simpleName}")
-                                // The error is already handled by AndroidCloudStorage and stored in authState
-                                // The SimpleLoginScreen will display it automatically via appState.authState.error
+                                
+                                // Force set the error in authState if it's not already set
+                                if (appState.authState.error == null) {
+                                    Log.d("MainActivity", "AuthState error is null, setting error manually")
+                                    appState.authState = appState.authState.copy(error = error?.message ?: "Sign-in failed")
+                                }
                                 
                                 // Ensure error is visible by logging it
-                                Log.d("MainActivity", "AuthState error: ${appState.authState.error}")
+                                Log.d("MainActivity", "AuthState error after handling: ${appState.authState.error}")
                                 Log.d("MainActivity", "AuthState isLoading: ${appState.authState.isLoading}")
+                                Log.d("MainActivity", "AuthState isAuthenticated: ${appState.authState.isAuthenticated}")
                             }
                         }
                     },

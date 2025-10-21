@@ -66,8 +66,13 @@ actual class CloudStorage(private val context: Context) {
             // Debug logging
             println("AndroidCloudStorage: Setting error: $errorMessage")
             println("AndroidCloudStorage: Original error: ${e.message}")
+            println("AndroidCloudStorage: AuthState before update: ${_authState.value}")
             
             _authState.value = _authState.value.copy(isLoading = false, error = errorMessage)
+            
+            println("AndroidCloudStorage: AuthState after update: ${_authState.value}")
+            println("AndroidCloudStorage: AuthState error: ${_authState.value.error}")
+            
             Result.failure(Exception(errorMessage))
         }
     }

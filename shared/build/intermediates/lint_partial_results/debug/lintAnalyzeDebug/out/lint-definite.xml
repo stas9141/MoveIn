@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.13.0" type="incidents">
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of com.google.firebase:firebase-auth-ktx than 22.3.0 is available: 23.2.1">
+        <fix-replace
+            description="Change to 23.2.1"
+            family="Update versions"
+            oldString="22.3.0"
+            replacement="23.2.1"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="38"
+            column="32"
+            startOffset="818"
+            endLine="38"
+            endColumn="78"
+            endOffset="864"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of com.google.firebase:firebase-firestore-ktx than 24.9.1 is available: 25.1.4">
+        <fix-replace
+            description="Change to 25.1.4"
+            family="Update versions"
+            oldString="24.9.1"
+            replacement="25.1.4"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="39"
+            column="32"
+            startOffset="897"
+            endLine="39"
+            endColumn="83"
+            endOffset="948"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of `compileSdkVersion` than 34 is available: 36">
+        <fix-replace
+            description="Set compileSdkVersion to 36"
+            oldString="34"
+            replacement="36"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="56"
+            column="5"
+            startOffset="1364"
+            endLine="56"
+            endColumn="20"
+            endOffset="1379"/>
+    </incident>
+
+    <incident
+        id="NewerVersionAvailable"
+        severity="warning"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-core than 1.7.3 is available: 1.10.2">
+        <fix-replace
+            description="Change to 1.10.2"
+            family="Update versions"
+            oldString="1.7.3"
+            replacement="1.10.2"
+            priority="0"/>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="28"
+            column="32"
+            startOffset="510"
+            endLine="28"
+            endColumn="85"
+            endOffset="563"/>
+    </incident>
+
+    <incident
+        id="UseTomlInstead"
+        severity="warning"
+        message="Use version catalog instead">
+        <fix-composite
+            description="Replace with new library catalog declaration for org-jetbrains-kotlinx-kotlinx-coroutines-core2"
+            robot="true">
+            <fix-replace
+                description="Replace with jetbrainsKotlinxCoroutinesCoreVersion = &quot;1.7.3&quot;..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="jetbrainsKotlinxCoroutinesCoreVersion = &quot;1.7.3&quot;&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="26"
+                    endOffset="26"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with org-jetbrains-kotlinx-kotlinx-coroutines-core2 = { module = &quot;org.jetbrains.kotlinx:kotlinx-coroutines-core&quot;, version.ref = &quot;jetbrainsKotlinxCoroutinesCoreVersion&quot; }..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="org-jetbrains-kotlinx-kotlinx-coroutines-core2 = { module = &quot;org.jetbrains.kotlinx:kotlinx-coroutines-core&quot;, version.ref = &quot;jetbrainsKotlinxCoroutinesCoreVersion&quot; }&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="1516"
+                    endOffset="1516"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with libs.org.jetbrains.kotlinx.kotlinx.coroutines.core2"
+                robot="true"
+                replacement="libs.org.jetbrains.kotlinx.kotlinx.coroutines.core2"
+                priority="0">
+                <range
+                    file="${:shared*projectDir}/build.gradle.kts"
+                    startOffset="510"
+                    endOffset="563"/>
+            </fix-replace>
+        </fix-composite>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="28"
+            column="32"
+            startOffset="510"
+            endLine="28"
+            endColumn="85"
+            endOffset="563"/>
+    </incident>
+
+    <incident
+        id="UseTomlInstead"
+        severity="warning"
+        message="Use version catalog instead">
+        <fix-composite
+            description="Replace with new library catalog declaration for com-google-firebase-firebase-auth-ktx2"
+            robot="true">
+            <fix-replace
+                description="Replace with googleFirebaseAuthKtxVersion = &quot;22.3.0&quot;..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="googleFirebaseAuthKtxVersion = &quot;22.3.0&quot;&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="26"
+                    endOffset="26"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with com-google-firebase-firebase-auth-ktx2 = { module = &quot;com.google.firebase:firebase-auth-ktx&quot;, version.ref = &quot;googleFirebaseAuthKtxVersion&quot; }..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="com-google-firebase-firebase-auth-ktx2 = { module = &quot;com.google.firebase:firebase-auth-ktx&quot;, version.ref = &quot;googleFirebaseAuthKtxVersion&quot; }&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="313"
+                    endOffset="313"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with libs.com.google.firebase.firebase.auth.ktx2"
+                robot="true"
+                replacement="libs.com.google.firebase.firebase.auth.ktx2"
+                priority="0">
+                <range
+                    file="${:shared*projectDir}/build.gradle.kts"
+                    startOffset="818"
+                    endOffset="864"/>
+            </fix-replace>
+        </fix-composite>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="38"
+            column="32"
+            startOffset="818"
+            endLine="38"
+            endColumn="78"
+            endOffset="864"/>
+    </incident>
+
+    <incident
+        id="UseTomlInstead"
+        severity="warning"
+        message="Use version catalog instead">
+        <fix-composite
+            description="Replace with new library catalog declaration for com-google-firebase-firebase-firestore-ktx2"
+            robot="true">
+            <fix-replace
+                description="Replace with googleFirebaseFirestoreKtxVersion = &quot;24.9.1&quot;..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="googleFirebaseFirestoreKtxVersion = &quot;24.9.1&quot;&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="26"
+                    endOffset="26"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with com-google-firebase-firebase-firestore-ktx2 = { module = &quot;com.google.firebase:firebase-firestore-ktx&quot;, version.ref = &quot;googleFirebaseFirestoreKtxVersion&quot; }..."
+                robot="true"
+                oldString="_lint_insert_begin_"
+                replacement="com-google-firebase-firebase-firestore-ktx2 = { module = &quot;com.google.firebase:firebase-firestore-ktx&quot;, version.ref = &quot;googleFirebaseFirestoreKtxVersion&quot; }&#xA;"
+                priority="0">
+                <range
+                    file="$HOME/AndroidStudioProjects/MoveIn/gradle/libs.versions.toml"
+                    startOffset="313"
+                    endOffset="313"/>
+            </fix-replace>
+            <fix-replace
+                description="Replace with libs.com.google.firebase.firebase.firestore.ktx2"
+                robot="true"
+                replacement="libs.com.google.firebase.firebase.firestore.ktx2"
+                priority="0">
+                <range
+                    file="${:shared*projectDir}/build.gradle.kts"
+                    startOffset="897"
+                    endOffset="948"/>
+            </fix-replace>
+        </fix-composite>
+        <location
+            file="${:shared*projectDir}/build.gradle.kts"
+            line="39"
+            column="32"
+            startOffset="897"
+            endLine="39"
+            endColumn="83"
+            endOffset="948"/>
+    </incident>
+
+</incidents>

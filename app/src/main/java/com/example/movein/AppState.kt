@@ -134,7 +134,10 @@ class AppState(
         coroutineScope.launch {
             try {
                 cloudStorage.authState.collect { authState ->
+                    println("AppState: Received authState from cloudStorage: $authState")
+                    println("AppState: AuthState error: ${authState.error}")
                     this@AppState.authState = authState
+                    println("AppState: Updated local authState: ${this@AppState.authState}")
                     if (authState.isAuthenticated && !isCloudSyncEnabled) {
                         enableCloudSync()
                     } else if (!authState.isAuthenticated && isCloudSyncEnabled) {
@@ -143,6 +146,7 @@ class AppState(
                 }
             } catch (e: Exception) {
                 // Handle cloud storage errors gracefully
+                println("AppState: Exception in authState collection: ${e.message}")
                 this@AppState.authState = AuthState(false, error = e.message)
             }
         }

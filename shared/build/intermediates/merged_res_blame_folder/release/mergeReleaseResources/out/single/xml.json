@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.example.movein.shared-release-9:/xml/image_share_filepaths.xml",
+        "source": "com.example.movein.shared-browser-1.4.0-1:/xml/image_share_filepaths.xml"
+    }
+]

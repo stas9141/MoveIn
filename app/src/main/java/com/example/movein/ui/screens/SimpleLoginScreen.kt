@@ -144,6 +144,9 @@ fun SimpleLoginScreen(
         
         // Always show current auth state for debugging
         println("SimpleLoginScreen: Current auth state - isLoading: $isLoading, error: $error")
+        println("SimpleLoginScreen: Error is null: ${error == null}")
+        println("SimpleLoginScreen: Error is empty: ${error?.isEmpty()}")
+        println("SimpleLoginScreen: Error length: ${error?.length}")
         
         // Google Sign-In Error Message
         googleSignInError?.let { errorMessage ->

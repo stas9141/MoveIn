@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.example.movein.shared-release-9:/raw/firebase_common_keep.xml",
+        "source": "com.example.movein.shared-firebase-common-20.4.2-4:/raw/firebase_common_keep.xml"
+    }
+]

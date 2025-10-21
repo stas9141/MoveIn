@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "com.example.movein.shared-release-9:/layout/custom_dialog.xml",
+        "source": "com.example.movein.shared-core-1.2.0-0:/layout/custom_dialog.xml"
+    },
+    {
+        "merged": "com.example.movein.shared-release-9:/layout/browser_actions_context_menu_row.xml",
+        "source": "com.example.movein.shared-browser-1.4.0-1:/layout/browser_actions_context_menu_row.xml"
+    },
+    {
+        "merged": "com.example.movein.shared-release-9:/layout/notification_template_part_time.xml",
+        "source": "com.example.movein.shared-core-1.2.0-0:/layout/notification_template_part_time.xml"
+    },
+    {
+        "merged": "com.example.movein.shared-release-9:/layout/browser_actions_context_menu_page.xml",
+        "source": "com.example.movein.shared-browser-1.4.0-1:/layout/browser_actions_context_menu_page.xml"
+    },
+    {
+        "merged": "com.example.movein.shared-release-9:/layout/notification_template_part_chronometer.xml",
+        "source": "com.example.movein.shared-core-1.2.0-0:/layout/notification_template_part_chronometer.xml"
+    }
+]
