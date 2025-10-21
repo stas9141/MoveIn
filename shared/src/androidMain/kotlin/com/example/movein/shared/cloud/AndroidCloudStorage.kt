@@ -60,19 +60,11 @@ actual class CloudStorage(private val context: Context) {
                 e.message?.contains("user-disabled") == true -> "This account has been disabled. Please contact support."
                 e.message?.contains("network-request-failed") == true -> "Network error. Please check your internet connection."
                 e.message?.contains("too-many-requests") == true -> "Too many attempts. Please try again later."
+                e.message?.contains("blocked all requests from this device due to unusual activity") == true -> "This device has been temporarily blocked due to unusual activity. Please try again later or contact support if the issue persists."
                 else -> e.message ?: "Unable to sign in. Please try again."
             }
             
-            // Debug logging
-            println("AndroidCloudStorage: Setting error: $errorMessage")
-            println("AndroidCloudStorage: Original error: ${e.message}")
-            println("AndroidCloudStorage: AuthState before update: ${_authState.value}")
-            
             _authState.value = _authState.value.copy(isLoading = false, error = errorMessage)
-            
-            println("AndroidCloudStorage: AuthState after update: ${_authState.value}")
-            println("AndroidCloudStorage: AuthState error: ${_authState.value.error}")
-            
             Result.failure(Exception(errorMessage))
         }
     }

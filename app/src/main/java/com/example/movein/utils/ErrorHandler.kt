@@ -21,6 +21,10 @@ object ErrorHandler {
             errorMessage.contains("supplied auth", ignoreCase = true) ->
                 "Incorrect password. Please try again."
 
+            errorMessage.contains("blocked all requests from this device due to unusual activity", ignoreCase = true) ||
+            errorMessage.contains("blocked all requests", ignoreCase = true) ->
+                "This device has been temporarily blocked due to unusual activity. Please try again later or contact support if the issue persists."
+
             errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
                 "No account found with this email. Please sign up first."
 
@@ -156,6 +160,7 @@ object ErrorHandler {
             errorMessage.contains("The email address is badly formatted", ignoreCase = true) -> ErrorType.AUTHENTICATION
             errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) -> ErrorType.AUTHENTICATION
             errorMessage.contains("supplied auth", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("blocked all requests from this device due to unusual activity", ignoreCase = true) -> ErrorType.AUTHENTICATION
             
             errorMessage.contains("network", ignoreCase = true) || 
             errorMessage.contains("connection", ignoreCase = true) ||
@@ -217,6 +222,10 @@ object ErrorHandler {
             errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) ||
             errorMessage.contains("supplied auth", ignoreCase = true) ->
                 "Incorrect password. Please try again."
+
+            errorMessage.contains("blocked all requests from this device due to unusual activity", ignoreCase = true) ||
+            errorMessage.contains("blocked all requests", ignoreCase = true) ->
+                "This device has been temporarily blocked due to unusual activity. Please try again later or contact support if the issue persists."
 
             errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
                 "No account found with this email. Please sign up first."
