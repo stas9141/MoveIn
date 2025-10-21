@@ -120,84 +120,8 @@ fun SimpleLoginScreen(
         
         // Error Messages
         error?.let { errorMessage ->
-            // Debug logging
-            println("SimpleLoginScreen: RAW ERROR MESSAGE: '$errorMessage'")
-            println("SimpleLoginScreen: Error type: ${errorMessage::class.simpleName}")
-            println("SimpleLoginScreen: Error length: ${errorMessage.length}")
-            println("SimpleLoginScreen: Error contains 'wrong-password': ${errorMessage.contains("wrong-password", ignoreCase = true)}")
-            println("SimpleLoginScreen: Error contains 'user-not-found': ${errorMessage.contains("user-not-found", ignoreCase = true)}")
-            println("SimpleLoginScreen: Error contains 'invalid-email': ${errorMessage.contains("invalid-email", ignoreCase = true)}")
-            
             val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
             val errorType = ErrorHandler.getErrorType(Exception(errorMessage))
-            
-            println("SimpleLoginScreen: User-friendly error: $userFriendlyError")
-            println("SimpleLoginScreen: Error type: $errorType")
-            
-            // TEMPORARY DEBUG: Show what ErrorHandler is returning
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "DEBUG - ErrorHandler Result:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Raw: '$errorMessage'",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    Text(
-                        text = "Processed: '$userFriendlyError'",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    
-                    // Test pattern matching directly
-                    val patternMatch = errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true)
-                    Text(
-                        text = "Pattern match: $patternMatch",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    
-                    // Test with a simpler pattern
-                    val simpleMatch = errorMessage.contains("supplied auth credentials", ignoreCase = true)
-                    Text(
-                        text = "Simple pattern match: $simpleMatch",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    
-                    // Show exact characters and length
-                    Text(
-                        text = "Length: ${errorMessage.length}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    
-                    // Test individual words
-                    val hasSupplied = errorMessage.contains("supplied", ignoreCase = true)
-                    val hasAuth = errorMessage.contains("auth", ignoreCase = true)
-                    val hasCredentials = errorMessage.contains("credentials", ignoreCase = true)
-                    Text(
-                        text = "Has 'supplied': $hasSupplied, 'auth': $hasAuth, 'credentials': $hasCredentials",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
             
             ErrorDisplay(
                 error = userFriendlyError,
@@ -206,16 +130,8 @@ fun SimpleLoginScreen(
                 showRecoverySuggestion = true
             )
             Spacer(modifier = Modifier.height(16.dp))
-        } ?: run {
-            // Debug: Log when no error is present
-            println("SimpleLoginScreen: No error to display")
         }
         
-        // Always show current auth state for debugging
-        println("SimpleLoginScreen: Current auth state - isLoading: $isLoading, error: $error")
-        println("SimpleLoginScreen: Error is null: ${error == null}")
-        println("SimpleLoginScreen: Error is empty: ${error?.isEmpty()}")
-        println("SimpleLoginScreen: Error length: ${error?.length}")
         
         // Google Sign-In Error Message
         googleSignInError?.let { errorMessage ->

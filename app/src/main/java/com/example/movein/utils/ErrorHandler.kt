@@ -13,11 +13,6 @@ object ErrorHandler {
         
         val errorMessage = error.message ?: "An unexpected error occurred"
         
-        // DEBUG: Log the error message and pattern matching
-        println("ErrorHandler: Processing error message: '$errorMessage'")
-        println("ErrorHandler: Checking pattern 'The supplied auth credentials is incorrect, malformed or has expired'")
-        println("ErrorHandler: Pattern match result: ${errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true)}")
-        
         return when {
             // Canonical Firebase client messages (exact phrases from tests/SDK)
             errorMessage.contains("The password is invalid", ignoreCase = true) ||
