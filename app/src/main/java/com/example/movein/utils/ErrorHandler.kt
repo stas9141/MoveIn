@@ -22,7 +22,8 @@ object ErrorHandler {
             // Canonical Firebase client messages (exact phrases from tests/SDK)
             errorMessage.contains("The password is invalid", ignoreCase = true) ||
             errorMessage.contains("does not have a password", ignoreCase = true) ||
-            errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) ->
+            errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) ||
+            errorMessage.contains("supplied auth", ignoreCase = true) ->
                 "Incorrect password. Please try again."
 
             errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
@@ -159,6 +160,7 @@ object ErrorHandler {
             errorMessage.contains("The password is invalid", ignoreCase = true) -> ErrorType.AUTHENTICATION
             errorMessage.contains("The email address is badly formatted", ignoreCase = true) -> ErrorType.AUTHENTICATION
             errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) -> ErrorType.AUTHENTICATION
+            errorMessage.contains("supplied auth", ignoreCase = true) -> ErrorType.AUTHENTICATION
             
             errorMessage.contains("network", ignoreCase = true) || 
             errorMessage.contains("connection", ignoreCase = true) ||
@@ -217,7 +219,8 @@ object ErrorHandler {
             // Canonical Firebase client messages (exact phrases from tests/SDK)
             errorMessage.contains("The password is invalid", ignoreCase = true) ||
             errorMessage.contains("does not have a password", ignoreCase = true) ||
-            errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) ->
+            errorMessage.contains("The supplied auth credentials is incorrect, malformed or has expired", ignoreCase = true) ||
+            errorMessage.contains("supplied auth", ignoreCase = true) ->
                 "Incorrect password. Please try again."
 
             errorMessage.contains("There is no user record corresponding to this identifier", ignoreCase = true) ->
