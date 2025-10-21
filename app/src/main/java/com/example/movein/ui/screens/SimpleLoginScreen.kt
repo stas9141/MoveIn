@@ -142,6 +142,9 @@ fun SimpleLoginScreen(
             println("SimpleLoginScreen: No error to display")
         }
         
+        // Always show current auth state for debugging
+        println("SimpleLoginScreen: Current auth state - isLoading: $isLoading, error: $error")
+        
         // Google Sign-In Error Message
         googleSignInError?.let { errorMessage ->
             val userFriendlyError = ErrorHandler.getUserFriendlyErrorMessage(Exception(errorMessage))
@@ -231,9 +234,7 @@ fun SimpleLoginScreen(
         // Sign In Button
         Button(
             onClick = {
-                // Clear any existing errors when attempting to sign in
-                onDismissError?.invoke()
-                onDismissGoogleError?.invoke()
+                // Don't clear errors here - let the sign-in process handle error display
                 scope.launch {
                     onSignInClick(email, password)
                 }
@@ -270,9 +271,7 @@ fun SimpleLoginScreen(
         // Google Sign In Button
         OutlinedButton(
             onClick = {
-                // Clear any existing errors when attempting to sign in
-                onDismissError?.invoke()
-                onDismissGoogleError?.invoke()
+                // Don't clear errors here - let the sign-in process handle error display
                 scope.launch {
                     onGoogleSignInClick()
                 }
@@ -289,9 +288,7 @@ fun SimpleLoginScreen(
             
             OutlinedButton(
                 onClick = {
-                    // Clear any existing errors when attempting to sign in
-                    onDismissError?.invoke()
-                    onDismissBiometricError?.invoke()
+                    // Don't clear errors here - let the sign-in process handle error display
                     scope.launch {
                         onBiometricSignInClick()
                     }
