@@ -134,37 +134,6 @@ fun SimpleLoginScreen(
             println("SimpleLoginScreen: User-friendly error: $userFriendlyError")
             println("SimpleLoginScreen: Error type: $errorType")
             
-            // TEMPORARY: Show raw error for debugging
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "DEBUG - Raw Error:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                    Text(
-                        text = "'$errorMessage'",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    Text(
-                        text = "Length: ${errorMessage.length}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
             ErrorDisplay(
                 error = userFriendlyError,
                 errorType = errorType,
