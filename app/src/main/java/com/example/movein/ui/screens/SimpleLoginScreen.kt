@@ -177,6 +177,23 @@ fun SimpleLoginScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                    
+                    // Show exact characters and length
+                    Text(
+                        text = "Length: ${errorMessage.length}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    
+                    // Test individual words
+                    val hasSupplied = errorMessage.contains("supplied", ignoreCase = true)
+                    val hasAuth = errorMessage.contains("auth", ignoreCase = true)
+                    val hasCredentials = errorMessage.contains("credentials", ignoreCase = true)
+                    Text(
+                        text = "Has 'supplied': $hasSupplied, 'auth': $hasAuth, 'credentials': $hasCredentials",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             }
             
