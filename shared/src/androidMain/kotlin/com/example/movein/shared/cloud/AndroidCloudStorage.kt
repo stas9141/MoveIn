@@ -22,12 +22,6 @@ actual class CloudStorage(private val context: Context) {
     private val _authState = MutableStateFlow(AuthState(false))
     private val _syncStatus = MutableStateFlow(SyncStatus())
     
-    init {
-        println("AndroidCloudStorage: Initializing with context: ${context.packageName}")
-        println("AndroidCloudStorage: FirebaseAuth instance: ${auth.app.name}")
-        println("AndroidCloudStorage: FirebaseFirestore instance: ${firestore.app.name}")
-    }
-    
     private var userDataListener: ListenerRegistration? = null
     private var checklistDataListener: ListenerRegistration? = null
     private var defectsListener: ListenerRegistration? = null
@@ -36,6 +30,10 @@ actual class CloudStorage(private val context: Context) {
     actual val syncStatus: Flow<SyncStatus> = _syncStatus.asStateFlow()
     
     init {
+        println("AndroidCloudStorage: Initializing with context: ${context.packageName}")
+        println("AndroidCloudStorage: FirebaseAuth instance: ${auth.app.name}")
+        println("AndroidCloudStorage: FirebaseFirestore instance: ${firestore.app.name}")
+        
         // Listen to auth state changes
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser

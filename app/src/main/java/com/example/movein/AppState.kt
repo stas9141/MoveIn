@@ -136,8 +136,11 @@ class AppState(
                 cloudStorage.authState.collect { authState ->
                     println("AppState: Received authState from cloudStorage: $authState")
                     println("AppState: AuthState error: ${authState.error}")
+                    println("AppState: AuthState isAuthenticated: ${authState.isAuthenticated}")
+                    println("AppState: AuthState email: ${authState.email}")
                     this@AppState.authState = authState
                     println("AppState: Updated local authState: ${this@AppState.authState}")
+                    println("AppState: Local authState isAuthenticated: ${this@AppState.authState.isAuthenticated}")
                     if (authState.isAuthenticated && !isCloudSyncEnabled) {
                         enableCloudSync()
                     } else if (!authState.isAuthenticated && isCloudSyncEnabled) {
@@ -305,6 +308,7 @@ class AppState(
 
     fun initializeUserData(data: UserData) {
         userData = data
+        isAnonymousUser = false // Mark user as authenticated (not anonymous)
         // Generate personalized checklist based on user data
         checklistData = com.example.movein.shared.data.ChecklistDataGenerator.generatePersonalizedChecklist(data)
         

@@ -25,6 +25,7 @@ fun ApartmentDetailsScreen(
     onBackClick: () -> Unit,
     onSignUpClick: () -> Unit,
     onSignInClick: () -> Unit,
+    isAuthenticated: Boolean = false, // Add authentication state parameter
     modifier: Modifier = Modifier
 ) {
     var selectedRooms by remember { mutableStateOf(setOf("Salon + Kitchen", "Mamad")) }
@@ -470,7 +471,13 @@ fun ApartmentDetailsScreen(
                     balconies = balconies
                 )
                 pendingUserData = userData
-                showLoginPrompt = true
+                // Only show login prompt for anonymous users
+                if (!isAuthenticated) {
+                    showLoginPrompt = true
+                } else {
+                    // User is authenticated, proceed directly
+                    onContinueClick(userData)
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()

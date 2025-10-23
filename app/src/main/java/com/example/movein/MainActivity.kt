@@ -440,7 +440,8 @@ fun MoveInApp() {
                                 Log.d("MainActivity", "Sign-up successful!")
                                 // Migrate anonymous data to the new account
                                 appState.migrateAnonymousDataToAccount()
-                                appState.navigateTo(Screen.Dashboard)
+                                // Navigate to onboarding for new users
+                                appState.navigateTo(Screen.ApartmentDetails)
                             } else {
                                 // Handle sign-up failure - error will be displayed by authState
                                 val error = result.exceptionOrNull()
@@ -575,7 +576,12 @@ fun MoveInApp() {
             Screen.ApartmentDetails -> {
                 ApartmentDetailsScreen(
                     onContinueClick = { userData ->
-                        appState.initializeAnonymousUserData(userData)
+                        // Check if user is authenticated (signed up) or anonymous
+                        if (appState.authState.isAuthenticated) {
+                            appState.initializeUserData(userData)
+                        } else {
+                            appState.initializeAnonymousUserData(userData)
+                        }
                         appState.navigateTo(Screen.Dashboard)
                     },
                     onBackClick = {
@@ -587,6 +593,7 @@ fun MoveInApp() {
                     onSignInClick = {
                         appState.navigateTo(Screen.Login)
                     },
+                    isAuthenticated = appState.authState.isAuthenticated, // Pass authentication state
                     modifier = Modifier.padding(innerPadding)
                 )
             }
