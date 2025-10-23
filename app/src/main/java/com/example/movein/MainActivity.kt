@@ -308,8 +308,11 @@ fun MoveInApp() {
                                 Log.d("MainActivity", "Sign-in successful!")
                                 // Clear auth error on successful login
                                 clearAuthError()
-                                // Migrate anonymous data to the signed-in account
-                                appState.migrateAnonymousDataToAccount()
+                                
+                                // Clear current user data and load new user's data from cloud
+                                appState.clearCurrentUserData()
+                                appState.syncFromCloud()
+                                
                                 // Enable biometric authentication after successful login
                                 try {
                                     val authManager = AuthManager(context)
@@ -438,8 +441,8 @@ fun MoveInApp() {
                             
                             if (result.isSuccess) {
                                 Log.d("MainActivity", "Sign-up successful!")
-                                // Migrate anonymous data to the new account
-                                appState.migrateAnonymousDataToAccount()
+                                // Clear any existing user data for fresh start
+                                appState.clearCurrentUserData()
                                 // Navigate to onboarding for new users
                                 appState.navigateTo(Screen.ApartmentDetails)
                             } else {

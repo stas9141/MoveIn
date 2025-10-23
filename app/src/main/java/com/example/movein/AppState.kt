@@ -1051,6 +1051,19 @@ class AppState(
     
     
     /**
+     * Clear current user data (for switching between users)
+     */
+    fun clearCurrentUserData() {
+        userData = null
+        checklistData = null
+        defects = emptyList()
+        selectedTask = null
+        selectedDefect = null
+        lastAddedTaskTab = null
+        pendingDefectDueDate = null
+    }
+    
+    /**
      * Clear user data while preserving predefined tasks
      */
     suspend fun clearAllData() {
