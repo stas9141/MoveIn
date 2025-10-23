@@ -437,6 +437,9 @@ fun MoveInApp() {
                                 // Migrate anonymous data to the new account
                                 appState.migrateAnonymousDataToAccount()
                                 appState.navigateTo(Screen.Dashboard)
+                            } else {
+                                // Handle sign-up failure - error will be displayed by authState
+                                Log.e("MainActivity", "Sign-up failed: ${result.exceptionOrNull()?.message}")
                             }
                         }
                     },
