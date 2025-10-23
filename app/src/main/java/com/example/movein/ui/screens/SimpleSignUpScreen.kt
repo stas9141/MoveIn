@@ -54,9 +54,11 @@ fun SimpleSignUpScreen(
         emailFocusRequester.requestFocus()
     }
     
-    val isPasswordValid = password.length >= 6
+    // Enhanced password validation
+    val isPasswordValid = password.length >= 6 && password.any { it.isLetter() } && password.any { it.isDigit() }
     val isPasswordMatch = password == confirmPassword
-    val isFormValid = email.isNotBlank() && isPasswordValid && isPasswordMatch
+    val isEmailValid = email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch
     
     Column(
         modifier = modifier
@@ -130,6 +132,19 @@ fun SimpleSignUpScreen(
                 onDismiss = onDismissError,
                 showRecoverySuggestion = true
             )
+            
+            // Add "Sign In Instead" button for account already exists error
+            if (errorMessage.contains("email-already-in-use", ignoreCase = true) || 
+                userFriendlyError.contains("already exists", ignoreCase = true)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onSignInClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Sign In Instead")
+                }
+            }
+            
             Spacer(modifier = Modifier.height(16.dp))
         }
         
@@ -165,7 +180,11 @@ fun SimpleSignUpScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(emailFocusRequester),
-            singleLine = true
+            singleLine = true,
+            isError = email.isNotBlank() && !isEmailValid,
+            supportingText = if (email.isNotBlank() && !isEmailValid) {
+                { Text("Please enter a valid email address") }
+            } else null
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -197,7 +216,7 @@ fun SimpleSignUpScreen(
             singleLine = true,
             isError = password.isNotBlank() && !isPasswordValid,
             supportingText = if (password.isNotBlank() && !isPasswordValid) {
-                { Text("Password must be at least 6 characters") }
+                { Text("Password must be at least 6 characters with letters and numbers") }
             } else null
         )
         

@@ -432,14 +432,21 @@ fun MoveInApp() {
                         clearAuthError()
                         clearGoogleSignInError()
                         coroutineScope.launch {
+                            Log.d("MainActivity", "Starting sign-up process for email: ${email.take(3)}***")
                             val result = appState.signUp(email, password)
+                            Log.d("MainActivity", "Sign-up result: ${result.isSuccess}")
+                            
                             if (result.isSuccess) {
+                                Log.d("MainActivity", "Sign-up successful!")
                                 // Migrate anonymous data to the new account
                                 appState.migrateAnonymousDataToAccount()
                                 appState.navigateTo(Screen.Dashboard)
                             } else {
                                 // Handle sign-up failure - error will be displayed by authState
-                                Log.e("MainActivity", "Sign-up failed: ${result.exceptionOrNull()?.message}")
+                                val error = result.exceptionOrNull()
+                                Log.e("MainActivity", "Sign-up failed: ${error?.message}")
+                                Log.e("MainActivity", "Sign-up error type: ${error?.javaClass?.simpleName}")
+                                Log.e("MainActivity", "AuthState error: ${appState.authState.error}")
                             }
                         }
                     },

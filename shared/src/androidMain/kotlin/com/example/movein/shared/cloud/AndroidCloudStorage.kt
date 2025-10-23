@@ -39,11 +39,13 @@ actual class CloudStorage(private val context: Context) {
         // Listen to auth state changes
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
+            println("AndroidCloudStorage: Auth state changed - user: ${user?.email}, authenticated: ${user != null}")
             _authState.value = AuthState(
                 isAuthenticated = user != null,
                 userId = user?.uid,
                 email = user?.email
             )
+            println("AndroidCloudStorage: Updated _authState: ${_authState.value}")
         }
     }
     
@@ -71,19 +73,58 @@ actual class CloudStorage(private val context: Context) {
     
     actual suspend fun signUp(email: String, password: String): Result<Unit> {
         return try {
+            println("AndroidCloudStorage: Starting sign-up for email: ${email.take(3)}***")
             _authState.value = _authState.value.copy(isLoading = true, error = null)
-            auth.createUserWithEmailAndPassword(email, password).await()
+            println("AndroidCloudStorage: AuthState set to loading: ${_authState.value}")
+            
+            val result = auth.createUserWithEmailAndPassword(email, password).await()
+            println("AndroidCloudStorage: Firebase sign-up successful, user: ${result.user?.email}")
+            println("AndroidCloudStorage: Current user after sign-up: ${auth.currentUser?.email}")
+            println("AndroidCloudStorage: Current user authenticated: ${auth.currentUser != null}")
+            
+            // The auth state listener should automatically update _authState
+            println("AndroidCloudStorage: AuthState after successful sign-up: ${_authState.value}")
+            
+            // Force update auth state to ensure it's set correctly
+            _authState.value = AuthState(
+                isAuthenticated = true,
+                userId = result.user?.uid,
+                email = result.user?.email
+            )
+            println("AndroidCloudStorage: Force updated AuthState: ${_authState.value}")
+            
             Result.success(Unit)
         } catch (e: Exception) {
+            // Debug: Log the actual exception details
+            println("AndroidCloudStorage: Exception caught during sign-up")
+            println("AndroidCloudStorage: Exception type: ${e.javaClass.simpleName}")
+            println("AndroidCloudStorage: Exception message: '${e.message}'")
+            println("AndroidCloudStorage: Exception cause: ${e.cause}")
+            println("AndroidCloudStorage: Full exception: $e")
+            
             val errorMessage = when {
-                e.message?.contains("email-already-in-use") == true -> "This email is already registered. Please try signing in instead."
+                e.message?.contains("email-already-in-use") == true -> "An account with this email already exists. Please sign in instead or use a different email address."
                 e.message?.contains("invalid-email") == true -> "Please enter a valid email address."
                 e.message?.contains("weak-password") == true -> "Password is too weak. Please choose a stronger password."
                 e.message?.contains("network-request-failed") == true -> "Network error. Please check your internet connection."
                 e.message?.contains("too-many-requests") == true -> "Too many attempts. Please try again later."
-                else -> e.message ?: "Unable to create account. Please try again."
+                e.message?.contains("operation-not-allowed") == true -> "Email/Password authentication is not enabled in Firebase Console. Please enable it in Authentication → Sign-in method → Email/Password."
+                else -> {
+                    println("AndroidCloudStorage: No specific pattern matched, using generic error")
+                    e.message ?: "Unable to create account. Please try again."
+                }
             }
+            
+            // Debug logging
+            println("AndroidCloudStorage: Setting error: $errorMessage")
+            println("AndroidCloudStorage: Original error: ${e.message}")
+            println("AndroidCloudStorage: AuthState before update: ${_authState.value}")
+            
             _authState.value = _authState.value.copy(isLoading = false, error = errorMessage)
+            
+            println("AndroidCloudStorage: AuthState after update: ${_authState.value}")
+            println("AndroidCloudStorage: AuthState error: ${_authState.value.error}")
+            
             Result.failure(Exception(errorMessage))
         }
     }
